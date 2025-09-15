@@ -36,7 +36,7 @@
 <body class="bg-gray-100 p-4 md:p-8">
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-[100] hidden">
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-[100]">
         <div class="flex flex-col items-center">
             <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -47,7 +47,7 @@
     </div>
 
     <!-- Main Application Container -->
-    <div id="app-container" class="container mx-auto bg-white/95 rounded-3xl shadow-xl transition-all duration-300">
+    <div id="app-container" class="container mx-auto bg-white/95 rounded-3xl shadow-xl transition-all duration-300 hidden">
 
         <!-- Header -->
         <header class="flex flex-col md:flex-row items-center justify-between p-4 bg-white/90 rounded-2xl shadow-lg mb-6 gap-4">
@@ -255,28 +255,24 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        setLogLevel('debug');
-
-        // Firebase global variables
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        // PASTE YOUR FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            // apiKey: "YOUR_API_KEY",
+            // authDomain: "YOUR_AUTH_DOMAIN",
+            // projectId: "YOUR_PROJECT_ID",
+            // ...other properties
+        };
         const LOCATION_NAME = "Nashik, Maharashtra, India";
-        const TOTAL_BATTERY_CAPACITY_KWH = 50;
         
-        let app, db, auth;
-        let authReady = false;
-
         const loadingOverlay = document.getElementById('loading-overlay');
         const alertCard = document.getElementById('alert-card');
         const predictedStorageElem = document.getElementById('predicted-storage');
         const predictedMessageElem = document.getElementById('predicted-message');
         const blackoutTipsElem = document.getElementById('blackout-tips');
+        const appId = "volt-vision";
 
         function updateDashboardUI(data) {
             // Update cards with data from local storage
@@ -340,61 +336,67 @@
             document.getElementById('sunrise-time').textContent = weatherData.sunrise;
             document.getElementById('sunset-time').textContent = weatherData.sunset;
         }
+        
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('date').textContent = now.toLocaleDateString('en-US', options);
+            document.getElementById('time').textContent = now.toLocaleTimeString('en-US');
+            document.getElementById('last-updated').textContent = now.toLocaleTimeString('en-US');
+        }
 
-        function initFirebase() {
+        document.addEventListener('DOMContentLoaded', () => {
+            let app, db, auth;
+            
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Authentication listener to handle signed-in state
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        console.log('User signed in:', user.uid);
-                        authReady = true;
-
-                        // Start real-time listener for weather data
-                        const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
-                        onSnapshot(weatherDocRef, (docSnap) => {
-                            if (docSnap.exists()) {
-                                const weatherData = docSnap.data();
-                                updateWeatherUI(weatherData);
-                                console.log('Weather data updated from Firestore:', weatherData);
-                            } else {
-                                console.log('No weather data found in Firestore.');
-                            }
-                        });
-                    } else {
-                        console.log('User signed out or not authenticated. Signing in anonymously...');
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
+                signInAnonymously(auth).then(() => {
+                    console.log('User signed in anonymously.');
+                    const userId = auth.currentUser.uid;
+                    const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
+                    
+                    onSnapshot(weatherDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            const weatherData = docSnap.data();
+                            updateWeatherUI(weatherData);
+                            console.log('Weather data updated from Firestore.');
                         } else {
-                            await signInAnonymously(auth);
+                            console.log('No weather data found in Firestore.');
                         }
-                    }
+                    });
+                    
+                    document.getElementById('app-container').classList.remove('hidden');
                     loadingOverlay.classList.add('hidden');
+
+                }).catch(e => {
+                    console.error('Authentication or Firestore setup failed:', e);
+                    showErrorScreen();
                 });
             } catch (e) {
-                console.error('Failed to initialize Firebase:', e);
-                // Handle case where Firebase is not configured
+                console.error('Failed to initialize Firebase app:', e);
+                showErrorScreen();
+            }
+
+            function showErrorScreen() {
                 document.getElementById('app-container').innerHTML = `
                     <div class="flex flex-col items-center justify-center p-8 text-center text-red-700 bg-red-100 rounded-lg">
                         <i class="fas fa-exclamation-circle text-5xl mb-4"></i>
                         <h2 class="text-2xl font-bold mb-2">Application Error</h2>
                         <p class="text-lg">Failed to initialize the application. This app requires a hosted environment with Firebase configuration.</p>
-                        <p class="mt-4 text-sm text-gray-600">For testing purposes, please use the provided Preview button or upload the files to a live hosting service.</p>
+                        <p class="mt-4 text-sm text-gray-600">To use this app, please add your Firebase configuration to the code.</p>
                     </div>
                 `;
+                document.getElementById('app-container').classList.remove('hidden');
                 loadingOverlay.classList.add('hidden');
             }
-        }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initFirebase();
             updateDateTime();
             setInterval(updateDateTime, 1000);
 
-            // Periodically check local storage for updates (for non-weather data)
+            // Periodically check local storage for non-weather data
             setInterval(() => {
                 const data = localStorage.getItem('microgridData');
                 if (data) {
