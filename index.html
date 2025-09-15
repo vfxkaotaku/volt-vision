@@ -8,15 +8,23 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #004d40, #2e7d32, #66bb6a);
             background-attachment: fixed;
+            min-height: 100vh;
         }
 
         .dashboard-grid {
             grid-template-columns: repeat(4, 1fr);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         @media (max-width: 1200px) {
@@ -30,316 +38,767 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .progress-bar {
+            transition: width 1s ease-in-out;
+        }
+
+        .tab-active {
+            background-color: #16a34a;
+            color: white;
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
     </style>
 </head>
 
-<body class="bg-gray-100 p-4 md:p-8">
+<body class="p-4 md:p-8">
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-[100]">
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
         <div class="flex flex-col items-center">
             <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p class="mt-4 text-green-600 font-medium">Processing...</p>
+            <p class="mt-4 text-green-600 font-medium" id="loading-text">Initializing Application...</p>
+            <div id="firebase-error" class="mt-4 p-4 bg-red-100 text-red-700 rounded-lg hidden">
+                <p class="font-semibold">Firebase Connection Issue</p>
+                <p class="text-sm mt-2">Using demo data instead. Some features may be limited.</p>
+                <button id="continue-button" class="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                    Continue with Demo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration Modal -->
+    <div id="config-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-2xl p-8 max-w-md w-full mx-4">
+            <div class="text-center mb-6">
+                <i class="fas fa-database text-4xl text-green-600 mb-3"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Firebase Configuration</h2>
+                <p class="text-gray-600 mt-2">Please check your Firebase configuration</p>
+            </div>
+            <div class="mb-6 p-4 bg-gray-100 rounded-lg">
+                <p class="text-sm text-gray-700">Ensure your Firebase config is correctly set in the code and that you have the appropriate Firestore security rules.</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="retry-button" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors">
+                    Retry Connection
+                </button>
+                <button id="use-demo-button" class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl font-medium hover:bg-gray-600 transition-colors">
+                    Use Demo Data
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Main Application Container -->
-    <div id="app-container" class="container mx-auto bg-white/95 rounded-3xl shadow-xl transition-all duration-300 hidden">
+    <div id="app-container" class="container mx-auto hidden">
 
         <!-- Header -->
-        <header class="flex flex-col md:flex-row items-center justify-between p-4 bg-white/90 rounded-2xl shadow-lg mb-6 gap-4">
+        <header class="flex flex-col md:flex-row items-center justify-between p-4 md:p-6 glass-card rounded-2xl shadow-lg mb-6 gap-4">
             <div class="flex items-center gap-3">
                 <i class="fas fa-solar-panel text-3xl text-green-600"></i>
                 <h1 class="font-bold text-2xl text-green-800">Advanced Microgrid Monitoring</h1>
             </div>
             <div class="flex flex-col md:flex-row items-center gap-4">
-                <a href="input.html" class="px-4 py-2 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition-colors">
-                    <i class="fas fa-edit"></i> Manual Input
-                </a>
-                <div id="location-info" class="text-right text-gray-600">
-                    <p class="text-sm font-medium">Location: <span id="location-name"></span></p>
-                    <p class="text-xs">Data Last Updated: <span id="last-updated" class="font-mono">...</span></p>
+                <div class="flex gap-2">
+                    <button id="simulate-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-bolt"></i> Simulate Data
+                    </button>
+                    <button id="refresh-btn" class="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
                 </div>
-                <div class="date-time text-center md:text-right text-gray-600">
-                    <p id="date" class="text-base font-medium"></p>
-                    <p id="time" class="text-sm"></p>
+                <div id="connection-status" class="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full">
+                    <i class="fas fa-wifi"></i>
+                    <span class="text-sm">Online</span>
+                </div>
+                <div id="location-info" class="text-right text-gray-700">
+                    <p class="text-sm font-medium flex items-center gap-1"><i class="fas fa-map-marker-alt text-green-600"></i> <span id="location-name">Nashik, Maharashtra, India</span></p>
+                    <p class="text-xs flex items-center gap-1"><i class="fas fa-clock text-green-600"></i> Updated: <span id="last-updated" class="font-mono">--:--:--</span></p>
+                </div>
+                <div class="date-time text-center md:text-right text-gray-700 flex items-center gap-2">
+                    <i class="fas fa-calendar-day text-green-600"></i>
+                    <div>
+                        <p id="date" class="text-base font-medium"></p>
+                        <p id="time" class="text-sm"></p>
+                    </div>
                 </div>
             </div>
         </header>
 
         <!-- Alert Section -->
-        <div id="alert-card" class="bg-white/95 rounded-2xl p-6 shadow-lg mb-6 border-l-4 border-red-500 transition-transform duration-300 hidden">
+        <div id="alert-card" class="glass-card rounded-2xl p-6 shadow-lg mb-6 border-l-4 border-yellow-500">
             <div class="flex items-center gap-3 mb-4">
-                <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
-                <h2 class="text-xl font-semibold text-red-600">Low Battery Alert</h2>
+                <i class="fas fa-exclamation-triangle text-2xl text-yellow-500"></i>
+                <h2 class="text-xl font-semibold text-yellow-700">Low Battery Alert</h2>
             </div>
-            <p class="text-gray-700 leading-relaxed mb-4">Battery level is at <span id="alert-battery-level">...</span>. To prevent a blackout, please follow these suggestions:</p>
-            <ul id="alert-suggestions" class="list-disc list-inside text-gray-600 leading-snug">
-                <!-- Suggestions will be injected here -->
+            <p class="text-gray-700 leading-relaxed mb-4">Battery level is at <span id="alert-battery-level" class="font-bold">42%</span>. To prevent a blackout, please follow these suggestions:</p>
+            <ul id="alert-suggestions" class="list-disc list-inside text-gray-700 space-y-2 pl-5">
+                <li>Avoid using high voltage appliances like water pumps between 6 PM - 10 PM</li>
+                <li>Limit use of non-essential appliances during peak hours</li>
+                <li>Use energy-efficient LED lighting which consumes less power</li>
+                <li>Consider shifting laundry and dishwashing to daylight hours</li>
             </ul>
+            <div class="mt-4 flex gap-3">
+                <button class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                    Acknowledge
+                </button>
+                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors">
+                    View Details
+                </button>
+            </div>
         </div>
 
         <!-- Dashboard Grid -->
-        <div class="dashboard-grid grid gap-6">
+        <div class="dashboard-grid grid gap-6 mb-6">
 
             <!-- Weather Card -->
-            <div class="bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-full">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-sun mr-2"></i> Today's Weather</h2>
-                    <i id="weather-icon" class="text-5xl text-yellow-500 fas fa-cloud-sun"></i>
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover col-span-2">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-cloud-sun"></i> Today's Weather</h2>
+                    <div class="flex items-center gap-2 text-green-700">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="weather-location">Nashik, India</span>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center flex-wrap gap-4">
-                    <div class="weather-info flex-1">
-                        <div class="text-4xl font-bold text-green-600 mb-2"><span id="weather-temp">...</span></div>
-                        <div id="weather-condition" class="text-gray-600 text-lg">...</div>
-                        <div class="flex gap-4 mt-4 flex-wrap">
-                            <div class="flex items-center gap-1 bg-green-100/50 rounded-lg px-3 py-1 text-sm text-green-800 font-medium"><i class="fas fa-wind"></i> <span id="weather-wind">...</span></div>
-                            <div class="flex items-center gap-1 bg-green-100/50 rounded-lg px-3 py-1 text-sm text-green-800 font-medium"><i class="fas fa-tint"></i> <span id="weather-humidity">...</span></div>
-                            <div class="flex items-center gap-1 bg-green-100/50 rounded-lg px-3 py-1 text-sm text-green-800 font-medium"><i class="fas fa-compress-alt"></i> <span id="weather-pressure">...</span></div>
+                <div class="flex flex-col md:flex-row justify-between items-start gap-6">
+                    <div class="flex items-center gap-4">
+                        <i id="weather-icon" class="text-6xl text-yellow-500 fas fa-sun"></i>
+                        <div>
+                            <div class="text-4xl font-bold text-green-700"><span id="weather-temp">28°C</span></div>
+                            <div id="weather-condition" class="text-gray-600">Sunny</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
+                            <i class="fas fa-wind text-green-600"></i>
+                            <div>
+                                <div class="text-sm text-green-800 font-medium"><span id="weather-wind">12 km/h</span></div>
+                                <div class="text-xs text-gray-600">Wind</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
+                            <i class="fas fa-tint text-green-600"></i>
+                            <div>
+                                <div class="text-sm text-green-800 font-medium"><span id="weather-humidity">65%</span></div>
+                                <div class="text-xs text-gray-600">Humidity</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
+                            <i class="fas fa-compress-alt text-green-600"></i>
+                            <div>
+                                <div class="text-sm text-green-800 font-medium"><span id="weather-pressure">1013 hPa</span></div>
+                                <div class="text-xs text-gray-600">Pressure</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
+                            <i class="fas fa-eye text-green-600"></i>
+                            <div>
+                                <div class="text-sm text-green-800 font-medium"><span id="weather-visibility">10 km</span></div>
+                                <div class="text-xs text-gray-600">Visibility</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="sunlight-today" class="text-lg font-semibold text-green-800">...</div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                    <div class="bg-green-50 p-4 rounded-xl text-center">
+                        <div id="sunlight-today" class="text-lg font-semibold text-green-800">6.2 hrs</div>
                         <div class="text-sm text-gray-600">Sunlight Today</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="solar-irradiance" class="text-lg font-semibold text-green-800">...</div>
+                    <div class="bg-green-50 p-4 rounded-xl text-center">
+                        <div id="solar-irradiance" class="text-lg font-semibold text-green-800">4.2 kWh/m²</div>
                         <div class="text-sm text-gray-600">Solar Irradiance</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="sunrise-time" class="text-lg font-semibold text-green-800">...</div>
+                    <div class="bg-green-50 p-4 rounded-xl text-center">
+                        <div id="sunrise-time" class="text-lg font-semibold text-green-800">06:12 AM</div>
                         <div class="text-sm text-gray-600">Sunrise</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="sunset-time" class="text-lg font-semibold text-green-800">...</div>
+                    <div class="bg-green-50 p-4 rounded-xl text-center">
+                        <div id="sunset-time" class="text-lg font-semibold text-green-800">06:45 PM</div>
                         <div class="text-sm text-gray-600">Sunset</div>
                     </div>
                 </div>
             </div>
 
             <!-- Solar Generation Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-solar-panel mr-2"></i> Solar Generation</h2>
-                    <i class="fas fa-bolt text-3xl text-green-600"></i>
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-solar-panel"></i> Solar Generation</h2>
+                    <i class="fas fa-bolt text-2xl text-yellow-500"></i>
                 </div>
-                <div class="text-4xl font-bold text-green-600 mb-1"><span id="solar-current-output">...</span></div>
-                <div class="text-sm text-gray-600 mb-4">Current Power Output</div>
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="solar-progress" class="bg-green-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                <div class="text-center mb-4">
+                    <div class="text-4xl font-bold text-green-700"><span id="solar-current-output">3.2</span> <span class="text-2xl">kW</span></div>
+                    <div class="text-sm text-gray-600">Current Power Output</div>
                 </div>
-                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0 kW</span><span>5 kW Max</span></div>
-                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="solar-today-gen" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">Today's Generation</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div id="solar-progress" class="bg-yellow-500 h-2.5 rounded-full progress-bar" style="width: 64%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-600 mb-6">
+                    <span>0 kW</span>
+                    <span>5 kW Max</span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="solar-today-gen" class="text-lg font-semibold text-green-800">18.6 kWh</div>
+                        <div class="text-xs text-gray-600">Today's Generation</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="solar-month-gen" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">This Month</div>
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="solar-month-gen" class="text-lg font-semibold text-green-800">542 kWh</div>
+                        <div class="text-xs text-gray-600">This Month</div>
                     </div>
                 </div>
             </div>
 
             <!-- Battery Status Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-battery-full mr-2"></i> Battery Status</h2>
-                    <i class="fas fa-car-battery text-3xl text-green-600"></i>
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-battery-full"></i> Battery Status</h2>
+                    <i class="fas fa-car-battery text-2xl text-green-600"></i>
                 </div>
-                <div class="text-4xl font-bold text-green-600 mb-1"><span id="battery-level-value">...</span></div>
-                <div class="text-sm text-gray-600 mb-4">Current Capacity</div>
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="battery-progress" class="bg-green-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                <div class="text-center mb-4">
+                    <div class="text-4xl font-bold text-green-700"><span id="battery-level-value">42</span><span class="text-2xl">%</span></div>
+                    <div class="text-sm text-gray-600">Current Capacity</div>
                 </div>
-                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0%</span><span>100%</span></div>
-                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="backup-time" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">Backup Time</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div id="battery-progress" class="bg-green-600 h-2.5 rounded-full progress-bar" style="width: 42%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-600 mb-6">
+                    <span>0%</span>
+                    <span>100%</span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="backup-time" class="text-lg font-semibold text-green-800">5.2 hrs</div>
+                        <div class="text-xs text-gray-600">Backup Time</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="battery-temp" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">Temperature</div>
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="battery-temp" class="text-lg font-semibold text-green-800">28°C</div>
+                        <div class="text-xs text-gray-600">Temperature</div>
                     </div>
                 </div>
             </div>
 
             <!-- Energy Consumption Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-plug mr-2"></i> Energy Consumption</h2>
-                    <i class="fas fa-chart-line text-3xl text-green-600"></i>
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-plug"></i> Energy Consumption</h2>
+                    <i class="fas fa-chart-line text-2xl text-green-600"></i>
                 </div>
-                <div class="text-4xl font-bold text-green-600 mb-1"><span id="current-load">...</span></div>
-                <div class="text-sm text-gray-600 mb-4">Current Load</div>
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="consumption-progress" class="bg-green-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                <div class="text-center mb-4">
+                    <div class="text-4xl font-bold text-green-700"><span id="current-load">2.8</span> <span class="text-2xl">kW</span></div>
+                    <div class="text-sm text-gray-600">Current Load</div>
                 </div>
-                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0 kW</span><span>5 kW Max</span></div>
-                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="today-usage" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">Today's Usage</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div id="consumption-progress" class="bg-green-600 h-2.5 rounded-full progress-bar" style="width: 56%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-600 mb-6">
+                    <span>0 kW</span>
+                    <span>5 kW Max</span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="today-usage" class="text-lg font-semibold text-green-800">15.4 kWh</div>
+                        <div class="text-xs text-gray-600">Today's Usage</div>
                     </div>
-                    <div class="bg-green-100/50 p-3 rounded-lg">
-                        <div id="month-usage" class="text-lg font-semibold text-green-800">...</div>
-                        <div class="text-sm text-gray-600">This Month</div>
+                    <div class="bg-green-50 p-3 rounded-xl text-center">
+                        <div id="month-usage" class="text-lg font-semibold text-green-800">462 kWh</div>
+                        <div class="text-xs text-gray-600">This Month</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Predictive Analytics Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-chart-line mr-2"></i> Predictive Insights</h2>
-                    <i class="fas fa-brain text-3xl text-green-600"></i>
+            <!-- Energy Flow Chart Card -->
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover col-span-2">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-chart-pie"></i> Energy Distribution</h2>
+                    <i class="fas fa-sliders-h text-2xl text-green-600"></i>
                 </div>
-                <div class="mb-4">
+                <div class="h-72">
+                    <canvas id="energy-flow-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Predictive Analytics Card -->
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover col-span-2">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-chart-line"></i> Predictive Insights</h2>
+                    <i class="fas fa-brain text-2xl text-green-600"></i>
+                </div>
+                <div class="mb-6">
                     <div class="text-lg font-medium text-gray-700">
                         Predicted energy stored in the next 3 hours:
-                        <span id="predicted-storage" class="font-bold text-green-600">...</span>
+                        <span id="predicted-storage" class="font-bold text-green-700">2.5 - 3.5 kWh</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                        <div class="bg-green-600 h-2.5 rounded-full" style="width: 65%"></div>
                     </div>
                 </div>
                 <div>
-                    <div class="text-lg font-medium text-gray-700">
-                        <span id="predicted-message" class="font-bold text-green-600">...</span>
+                    <div class="text-lg font-medium text-gray-700 mb-4">
+                        <span id="predicted-message" class="font-bold text-green-700">Based on current usage, your remaining energy will last for approximately 5 hours.</span>
                     </div>
-                    <div id="blackout-suggestions" class="mt-2 text-gray-600">
-                        <h3 class="font-semibold text-sm mb-1">Blackout Prevention Tips:</h3>
-                        <ul id="blackout-tips" class="list-disc list-inside text-sm">
-                            <!-- Tips will be injected here -->
+                    <div id="blackout-suggestions" class="bg-yellow-50 p-4 rounded-xl">
+                        <h3 class="font-semibold text-yellow-800 mb-2 flex items-center gap-2"><i class="fas fa-lightbulb"></i> Blackout Prevention Tips:</h3>
+                        <ul id="blackout-tips" class="list-disc list-inside text-yellow-700 space-y-1 text-sm">
+                            <li>Reduce AC usage during peak hours (6 PM - 10 PM)</li>
+                            <li>Schedule high-consumption appliances like washing machines during daylight</li>
+                            <li>Turn off non-essential lighting during evening hours</li>
+                            <li>Use energy-saving mode on all devices</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appliance Recommendations Card -->
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover col-span-2">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-lightbulb"></i> Appliance Recommendations</h2>
+                    <i class="fas fa-boxes text-2xl text-green-600"></i>
+                </div>
+                <p class="text-gray-700 mb-4">Based on current battery level (42%), here are recommended appliances to use:</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-4 rounded-xl">
+                        <h3 class="font-semibold text-green-800 mb-2 flex items-center gap-2"><i class="fas fa-check-circle text-green-500"></i> Recommended</h3>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>LED Lighting (5-10W each)</li>
+                            <li>Phone/Tablet Charging (10-20W)</li>
+                            <li>Laptop (50-100W)</li>
+                            <li>Wi-Fi Router (10-20W)</li>
+                        </ul>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-xl">
+                        <h3 class="font-semibold text-yellow-800 mb-2 flex items-center gap-2"><i class="fas fa-exclamation-circle text-yellow-500"></i> Use Sparingly</h3>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>Television (100-200W)</li>
+                            <li>Refrigerator (100-200W)</li>
+                            <li>Fan (50-100W)</li>
+                            <li>Water Pump (500-1000W)</li>
                         </ul>
                     </div>
                 </div>
             </div>
 
             <!-- Current & Voltage Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
-                <div class="flex items-center justify-between border-b pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-bolt mr-2"></i> Current & Voltage</h2>
-                    <i class="fas fa-tachometer-alt text-3xl text-green-600"></i>
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-bolt"></i> System Metrics</h2>
+                    <i class="fas fa-tachometer-alt text-2xl text-green-600"></i>
                 </div>
                 <div class="flex gap-1 overflow-x-auto border-b border-gray-200 mb-4 pb-2">
-                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-green-600 text-white" data-tab="solar">Solar</button>
-                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="battery">Battery</button>
-                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="load">Load</button>
+                    <button class="tab tab-active px-4 py-2 rounded-xl text-sm font-medium transition-colors" data-tab="solar">Solar</button>
+                    <button class="tab px-4 py-2 rounded-xl text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="battery">Battery</button>
+                    <button class="tab px-4 py-2 rounded-xl text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="load">Load</button>
                 </div>
-                <div id="solar-tab" class="tab-content">
-                    <div class="text-3xl font-bold text-green-600 mb-1">...</div>
-                    <div class="text-sm text-gray-600 mb-2">Solar Output</div>
-                    <div class="text-xl font-semibold text-green-800">...</div>
-                    <div class="text-xs text-gray-600">Per Panel</div>
+                <div id="solar-tab" class="tab-content space-y-4">
+                    <div>
+                        <div class="text-3xl font-bold text-green-700">12.4V / 8.6A</div>
+                        <div class="text-sm text-gray-600">Solar Output</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-semibold text-green-800">320W</div>
+                        <div class="text-xs text-gray-600">Per Panel</div>
+                    </div>
                 </div>
-                <div id="battery-tab" class="tab-content hidden">
-                    <div class="text-3xl font-bold text-green-600 mb-1">...</div>
-                    <div class="text-sm text-gray-600 mb-2">Battery Output</div>
-                    <div class="text-xl font-semibold text-green-800">...</div>
-                    <div class="text-xs text-gray-600">Power Output</div>
+                <div id="battery-tab" class="tab-content hidden space-y-4">
+                    <div>
+                        <div class="text-3xl font-bold text-green-700">12.1V / 5.2A</div>
+                        <div class="text-sm text-gray-600">Battery Output</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-semibold text-green-800">63.0W</div>
+                        <div class="text-xs text-gray-600">Power Output</div>
+                    </div>
                 </div>
-                <div id="load-tab" class="tab-content hidden">
-                    <div class="text-3xl font-bold text-green-600 mb-1">...</div>
-                    <div class="text-sm text-gray-600 mb-2">AC Output</div>
-                    <div class="text-xl font-semibold text-green-800">...</div>
-                    <div class="text-xs text-gray-600">Power Consumption</div>
+                <div id="load-tab" class="tab-content hidden space-y-4">
+                    <div>
+                        <div class="text-3xl font-bold text-green-700">230V / 12.3A</div>
+                        <div class="text-sm text-gray-600">AC Output</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-semibold text-green-800">2.83kW</div>
+                        <div class="text-xs text-gray-600">Power Consumption</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Statistics Card -->
+            <div class="glass-card rounded-2xl p-6 shadow-lg card-hover">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-green-800 flex items-center gap-2"><i class="fas fa-chart-bar"></i> Daily Statistics</h2>
+                    <i class="fas fa-history text-2xl text-green-600"></i>
+                </div>
+                <div class="h-72">
+                    <canvas id="daily-stats-chart"></canvas>
                 </div>
             </div>
         </div>
 
+        <!-- Footer -->
+        <footer class="glass-card rounded-2xl p-6 text-center text-gray-600 text-sm">
+            <p>© 2023 Advanced Microgrid Monitoring System | Designed for Sustainable Energy Management</p>
+            <p class="mt-2 text-xs" id="data-source">Data Source: Demo Mode</p>
+        </footer>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // PASTE YOUR FIREBASE CONFIG HERE
-   const firebaseConfig = {
-  apiKey: "AIzaSyCIbHtS4kvuXrllfKrftVXBkcOjRRwqvU4",
-  authDomain: "volt-vision.firebaseapp.com",
-  projectId: "volt-vision",
-  storageBucket: "volt-vision.firebasestorage.app",
-  messagingSenderId: "614497986695",
-  appId: "1:614497986695:web:c64faf50459485fb50b022",
-  measurementId: "G-HBXS79FJBT"
-};
-        const LOCATION_NAME = "Nashik, Maharashtra, India";
-        
+    <script>
+        // DOM Elements
         const loadingOverlay = document.getElementById('loading-overlay');
-        const alertCard = document.getElementById('alert-card');
-        const predictedStorageElem = document.getElementById('predicted-storage');
-        const predictedMessageElem = document.getElementById('predicted-message');
-        const blackoutTipsElem = document.getElementById('blackout-tips');
-        const appId = "volt-vision";
+        const loadingText = document.getElementById('loading-text');
+        const firebaseError = document.getElementById('firebase-error');
+        const continueButton = document.getElementById('continue-button');
+        const configModal = document.getElementById('config-modal');
+        const retryButton = document.getElementById('retry-button');
+        const useDemoButton = document.getElementById('use-demo-button');
+        const appContainer = document.getElementById('app-container');
+        const connectionStatus = document.getElementById('connection-status');
+        const dataSource = document.getElementById('data-source');
+        const simulateBtn = document.getElementById('simulate-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        
+        // Global state
+        const LOCATION_NAME = "Nashik, Maharashtra, India";
+        const TOTAL_BATTERY_CAPACITY_KWH = 50;
+        let usingDemoData = false;
+        let energyFlowChart, dailyStatsChart;
 
+        // Mock data for demonstration
+        const mockData = {
+            solar: 3.2,
+            batteryLevel: 42,
+            consumption: 2.8,
+            solarToday: 18.6,
+            solarMonth: 542,
+            consumptionToday: 15.4,
+            consumptionMonth: 462,
+            backupTime: 5.2,
+            batteryTemp: 28,
+            solarVoltage: '12.4V / 8.6A',
+            batteryVoltage: '12.1V / 5.2A',
+            loadVoltage: '230V / 12.3A',
+            solarPerPanel: '320W',
+            batteryOutput: '63.0W',
+            loadConsumption: '2.83kW',
+            energyFlow: [72, 25, 3],
+            weather: {
+                temp: '28°C', 
+                condition: 'Sunny', 
+                wind: '12 km/h', 
+                humidity: '65%', 
+                pressure: '1013 hPa',
+                sunlight: '6.2 hrs', 
+                irradiance: '4.2 kWh/m²', 
+                sunrise: '06:12', 
+                sunset: '18:45', 
+                visibility: '10 km',
+                location: 'Nashik, India'
+            },
+            predictedStorage: "2.5 - 3.5 kWh",
+            predictedMessage: "Based on current usage, your remaining energy will last for approximately 5 hours.",
+            suggestions: [
+                "Avoid using high voltage appliances like water pumps between 6 PM - 10 PM", 
+                "Limit use of non-essential appliances during peak hours",
+                "Use energy-efficient LED lighting which consumes less power",
+                "Consider shifting laundry and dishwashing to daylight hours"
+            ]
+        };
+
+        // Initialize the application
+        function initApp() {
+            // Try to initialize Firebase
+            initFirebase();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initialize charts
+            initCharts();
+        }
+        
+        // Initialize Firebase
+        function initFirebase() {
+            loadingText.textContent = "Connecting to Firebase...";
+            
+            try {
+                // Your Firebase configuration
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCIbHtS4kvuXrllfKrftVXBkcOjRRwqvU4",
+                    authDomain: "volt-vision.firebaseapp.com",
+                    projectId: "volt-vision",
+                    storageBucket: "volt-vision.firebasestorage.app",
+                    messagingSenderId: "614497986695",
+                    appId: "1:614497986695:web:c64faf50459485fb50b022",
+                    measurementId: "G-HBXS79FJBT"
+                };
+                
+                // Check if Firebase app is already initialized
+                if (typeof firebase === 'undefined') {
+                    throw new Error('Firebase SDK not loaded');
+                }
+                
+                // Initialize Firebase
+                const app = firebase.initializeApp(firebaseConfig);
+                const auth = firebase.auth();
+                const db = firebase.firestore();
+                
+                // Try anonymous authentication
+                auth.signInAnonymously()
+                    .then(() => {
+                        console.log('User signed in anonymously.');
+                        const userId = auth.currentUser.uid;
+                        const weatherDocRef = db.collection('artifacts').doc('volt-vision')
+                                            .collection('public').doc('weather')
+                                            .collection('current').doc('current');
+                        
+                        // Listen for weather data
+                        weatherDocRef.onSnapshot((docSnap) => {
+                            if (docSnap.exists()) {
+                                const weatherData = docSnap.data();
+                                updateWeatherUI(weatherData);
+                                console.log('Weather data updated from Firestore.');
+                                connectionStatus.className = "flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full";
+                                connectionStatus.innerHTML = '<i class="fas fa-wifi"></i><span class="text-sm">Online</span>';
+                                dataSource.textContent = "Data Source: Firebase Realtime";
+                            } else {
+                                console.log('No weather data found in Firestore.');
+                                useDemoData();
+                            }
+                        }, (error) => {
+                            console.error('Error getting weather data:', error);
+                            useDemoData();
+                        });
+                        
+                        appContainer.classList.remove('hidden');
+                        loadingOverlay.classList.add('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Authentication failed:', error);
+                        useDemoData();
+                    });
+                    
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                useDemoData();
+            }
+        }
+        
+        // Use demo data instead of Firebase
+        function useDemoData() {
+            usingDemoData = true;
+            updateWeatherUI(mockData.weather);
+            updateDashboardUI(mockData);
+            appContainer.classList.remove('hidden');
+            loadingOverlay.classList.add('hidden');
+            connectionStatus.className = "flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full";
+            connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span class="text-sm">Demo Mode</span>';
+            dataSource.textContent = "Data Source: Demo Data";
+        }
+        
+        // Set up event listeners
+        function setupEventListeners() {
+            // Continue button to use demo data
+            continueButton.addEventListener('click', useDemoData);
+            
+            // Retry Firebase connection
+            retryButton.addEventListener('click', () => {
+                configModal.classList.add('hidden');
+                initFirebase();
+            });
+            
+            // Use demo data button
+            useDemoButton.addEventListener('click', () => {
+                configModal.classList.add('hidden');
+                useDemoData();
+            });
+            
+            // Simulate data button
+            simulateBtn.addEventListener('click', simulateDataChanges);
+            
+            // Refresh button
+            refreshBtn.addEventListener('click', () => {
+                if (usingDemoData) {
+                    updateDashboardUI(mockData);
+                } else {
+                    // If using Firebase, it will update automatically
+                    loadingOverlay.classList.remove('hidden');
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('hidden');
+                    }, 1000);
+                }
+            });
+            
+            // Tab functionality
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => {
+                        t.classList.remove('tab-active');
+                        t.classList.add('text-gray-600', 'hover:bg-gray-200');
+                    });
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    
+                    tab.classList.remove('text-gray-600', 'hover:bg-gray-200');
+                    tab.classList.add('tab-active');
+                    
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+                });
+            });
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Energy Flow Chart
+            const energyFlowCtx = document.getElementById('energy-flow-chart').getContext('2d');
+            energyFlowChart = new Chart(energyFlowCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Solar Generation', 'Battery Discharge', 'Grid Import'],
+                    datasets: [{
+                        data: mockData.energyFlow,
+                        backgroundColor: [
+                            '#4ade80',
+                            '#22c55e',
+                            '#16a34a'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Daily Stats Chart
+            const dailyStatsCtx = document.getElementById('daily-stats-chart').getContext('2d');
+            dailyStatsChart = new Chart(dailyStatsCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                    datasets: [
+                        {
+                            label: 'Generation (kW)',
+                            data: [0, 0.8, 2.5, 3.2, 2.0, 0.5],
+                            backgroundColor: '#4ade80'
+                        },
+                        {
+                            label: 'Consumption (kW)',
+                            data: [0.8, 1.2, 1.8, 2.5, 2.8, 1.5],
+                            backgroundColor: '#f59e0b'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'kW'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update the UI with data
         function updateDashboardUI(data) {
-            // Update cards with data from local storage
-            document.getElementById('solar-current-output').textContent = `${data.solar} kW`;
+            // Update cards with data
+            document.getElementById('solar-current-output').textContent = data.solar;
             document.getElementById('solar-progress').style.width = `${(data.solar / 5) * 100}%`;
             document.getElementById('solar-today-gen').textContent = `${data.solarToday} kWh`;
             document.getElementById('solar-month-gen').textContent = `${data.solarMonth} kWh`;
-
-            document.getElementById('battery-level-value').textContent = `${data.batteryLevel}%`;
+            
+            document.getElementById('battery-level-value').textContent = data.batteryLevel;
             document.getElementById('battery-progress').style.width = `${data.batteryLevel}%`;
             document.getElementById('backup-time').textContent = `${data.backupTime} hrs`;
             document.getElementById('battery-temp').textContent = `${data.batteryTemp}°C`;
-
-            document.getElementById('current-load').textContent = `${data.consumption} kW`;
+            
+            document.getElementById('current-load').textContent = data.consumption;
             document.getElementById('consumption-progress').style.width = `${(data.consumption / 5) * 100}%`;
             document.getElementById('today-usage').textContent = `${data.consumptionToday} kWh`;
             document.getElementById('month-usage').textContent = `${data.consumptionMonth} kWh`;
-
+            
             document.getElementById('solar-tab').innerHTML = `
-                <div class="text-3xl font-bold text-green-600 mb-1">${data.solarVoltage}</div>
-                <div class="text-sm text-gray-600 mb-2">Solar Output</div>
-                <div class="text-xl font-semibold text-green-800">${data.solarPerPanel}</div>
-                <div class="text-xs text-gray-600">Per Panel</div>
+                <div>
+                    <div class="text-3xl font-bold text-green-700">${data.solarVoltage}</div>
+                    <div class="text-sm text-gray-600">Solar Output</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-semibold text-green-800">${data.solarPerPanel}</div>
+                    <div class="text-xs text-gray-600">Per Panel</div>
+                </div>
             `;
             document.getElementById('battery-tab').innerHTML = `
-                <div class="text-3xl font-bold text-green-600 mb-1">${data.batteryVoltage}</div>
-                <div class="text-sm text-gray-600 mb-2">Battery Output</div>
-                <div class="text-xl font-semibold text-green-800">${data.batteryOutput}</div>
-                <div class="text-xs text-gray-600">Power Output</div>
+                <div>
+                    <div class="text-3xl font-bold text-green-700">${data.batteryVoltage}</div>
+                    <div class="text-sm text-gray-600">Battery Output</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-semibold text-green-800">${data.batteryOutput}</div>
+                    <div class="text-xs text-gray-600">Power Output</div>
+                </div>
             `;
             document.getElementById('load-tab').innerHTML = `
-                <div class="text-3xl font-bold text-green-600 mb-1">${data.loadVoltage}</div>
-                <div class="text-sm text-gray-600 mb-2">AC Output</div>
-                <div class="text-xl font-semibold text-green-800">${data.loadConsumption}</div>
-                <div class="text-xs text-gray-600">Power Consumption</div>
+                <div>
+                    <div class="text-3xl font-bold text-green-700">${data.loadVoltage}</div>
+                    <div class="text-sm text-gray-600">AC Output</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-semibold text-green-800">${data.loadConsumption}</div>
+                    <div class="text-xs text-gray-600">Power Consumption</div>
+                </div>
             `;
-
+            
             // Update predictive analytics
-            predictedStorageElem.textContent = data.predictedStorage;
-            predictedMessageElem.textContent = data.predictedMessage;
-            blackoutTipsElem.innerHTML = data.suggestions.map(s => `<li>${s}</li>`).join('');
-
-            // Hide or show alert card based on battery level
-            if (data.batteryLevel < 40) {
-                alertCard.classList.remove('hidden');
-                document.getElementById('alert-battery-level').textContent = `${data.batteryLevel}%`;
-                document.getElementById('alert-suggestions').innerHTML = data.suggestions.map(s => `<li>${s}</li>`).join('');
-            } else {
-                alertCard.classList.add('hidden');
+            document.getElementById('predicted-storage').textContent = data.predictedStorage;
+            document.getElementById('predicted-message').textContent = data.predictedMessage;
+            
+            // Update alert card
+            document.getElementById('alert-battery-level').textContent = `${data.batteryLevel}%`;
+            document.getElementById('alert-suggestions').innerHTML = data.suggestions.map(s => `<li>${s}</li>`).join('');
+            
+            // Update charts if they exist
+            if (energyFlowChart) {
+                energyFlowChart.data.datasets[0].data = data.energyFlow;
+                energyFlowChart.update();
             }
         }
-
+        
+        // Update weather UI
         function updateWeatherUI(weatherData) {
-            document.getElementById('location-name').textContent = weatherData.location;
+            document.getElementById('weather-location').textContent = weatherData.location || LOCATION_NAME;
             document.getElementById('weather-temp').textContent = weatherData.temp;
             document.getElementById('weather-condition').textContent = weatherData.condition;
             document.getElementById('weather-wind').textContent = weatherData.wind;
             document.getElementById('weather-humidity').textContent = weatherData.humidity;
+            document.getElementById('weather-pressure').textContent = weatherData.pressure;
+            document.getElementById('weather-visibility').textContent = weatherData.visibility;
             document.getElementById('sunlight-today').textContent = weatherData.sunlight;
             document.getElementById('solar-irradiance').textContent = weatherData.irradiance;
             document.getElementById('sunrise-time').textContent = weatherData.sunrise;
             document.getElementById('sunset-time').textContent = weatherData.sunset;
         }
         
+        // Update date and time
         function updateDateTime() {
             const now = new Date();
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -347,86 +806,50 @@
             document.getElementById('time').textContent = now.toLocaleTimeString('en-US');
             document.getElementById('last-updated').textContent = now.toLocaleTimeString('en-US');
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            let app, db, auth;
+        
+        // Simulate data changes
+        function simulateDataChanges() {
+            if (!usingDemoData) return;
             
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                signInAnonymously(auth).then(() => {
-                    console.log('User signed in anonymously.');
-                    const userId = auth.currentUser.uid;
-                    const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
-                    
-                    onSnapshot(weatherDocRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            const weatherData = docSnap.data();
-                            updateWeatherUI(weatherData);
-                            console.log('Weather data updated from Firestore.');
-                        } else {
-                            console.log('No weather data found in Firestore.');
-                        }
-                    });
-                    
-                    document.getElementById('app-container').classList.remove('hidden');
-                    loadingOverlay.classList.add('hidden');
-
-                }).catch(e => {
-                    console.error('Authentication or Firestore setup failed:', e);
-                    showErrorScreen();
-                });
-            } catch (e) {
-                console.error('Failed to initialize Firebase app:', e);
-                showErrorScreen();
-            }
-
-            function showErrorScreen() {
-                document.getElementById('app-container').innerHTML = `
-                    <div class="flex flex-col items-center justify-center p-8 text-center text-red-700 bg-red-100 rounded-lg">
-                        <i class="fas fa-exclamation-circle text-5xl mb-4"></i>
-                        <h2 class="text-2xl font-bold mb-2">Application Error</h2>
-                        <p class="text-lg">Failed to initialize the application. This app requires a hosted environment with Firebase configuration.</p>
-                        <p class="mt-4 text-sm text-gray-600">To use this app, please add your Firebase configuration to the code.</p>
-                    </div>
-                `;
-                document.getElementById('app-container').classList.remove('hidden');
-                loadingOverlay.classList.add('hidden');
-            }
-
+            // Randomly adjust values for simulation
+            const newData = {...mockData};
+            newData.solar = (Math.random() * 5).toFixed(1);
+            newData.batteryLevel = Math.min(100, Math.max(0, Math.floor(newData.batteryLevel + (Math.random() * 10 - 5))));
+            newData.consumption = (Math.random() * 5).toFixed(1);
+            newData.batteryTemp = Math.floor(20 + Math.random() * 15);
+            
+            updateDashboardUI(newData);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg';
+            notification.innerHTML = '<i class="fas fa-bolt mr-2"></i> Data simulated successfully';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
             updateDateTime();
             setInterval(updateDateTime, 1000);
-
-            // Periodically check local storage for non-weather data
-            setInterval(() => {
-                const data = localStorage.getItem('microgridData');
-                if (data) {
-                    updateDashboardUI(JSON.parse(data));
+            
+            // Show Firebase error after 5 seconds if still loading
+            setTimeout(() => {
+                if (loadingOverlay.style.display !== 'none') {
+                    firebaseError.classList.remove('hidden');
                 }
             }, 5000);
-
-            // Tab functionality
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.tab').forEach(t => {
-                        t.classList.remove('bg-green-600', 'text-white');
-                        t.classList.add('text-gray-600', 'hover:bg-gray-200');
-                    });
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-
-                    tab.classList.remove('text-gray-600', 'hover:bg-gray-200');
-                    tab.classList.add('bg-green-600', 'text-white');
-
-                    const tabId = tab.getAttribute('data-tab');
-                    document.getElementById(`${tabId}-tab`).classList.remove('hidden');
-                });
-            });
         });
     </script>
+
+    <!-- Load Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </body>
 
 </html>
-
-
