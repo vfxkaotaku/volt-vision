@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Microgrid Monitoring</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background-attachment: fixed;
+        }
+
+        .dashboard-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 md:p-8">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-[100] hidden">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-blue-600 font-medium">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-container" class="container mx-auto p-4 md:p-8 bg-white/95 rounded-3xl shadow-xl transition-all duration-300 transform scale-95 opacity-0 hidden">
+
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row items-center justify-between p-4 bg-white/90 rounded-2xl shadow-lg mb-6 gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-solar-panel text-3xl text-blue-600"></i>
+                <h1 class="font-bold text-2xl text-blue-800">Advanced Microgrid Monitoring</h1>
+            </div>
+            <div class="flex flex-col md:flex-row items-center gap-4">
+                <div id="location-info" class="text-right text-gray-600">
+                    <p class="text-sm font-medium">Location: <span id="location-name"></span></p>
+                    <p class="text-xs">User ID: <span id="user-id" class="font-mono">...</span></p>
+                </div>
+                <div class="date-time text-center md:text-right text-gray-600">
+                    <p id="date" class="text-base font-medium"></p>
+                    <p id="time" class="text-sm"></p>
+                </div>
+                <button id="logout-btn" class="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Alert Section -->
+        <div id="alert-card" class="bg-white/95 rounded-2xl p-6 shadow-lg mb-6 border-l-4 border-red-500 transition-transform duration-300 hidden">
+            <div class="flex items-center gap-3 mb-4">
+                <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                <h2 class="text-xl font-semibold text-red-600">Low Battery Alert</h2>
+            </div>
+            <p class="text-gray-700 leading-relaxed mb-4">Battery level is at <span id="alert-battery-level">42%</span>. To prevent a blackout, please follow these suggestions:</p>
+            <ul id="alert-suggestions" class="list-disc list-inside text-gray-600 leading-snug">
+                <!-- Suggestions will be injected here -->
+            </ul>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid grid gap-6">
+
+            <!-- Weather Card -->
+            <div class="bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-sun mr-2"></i> Today's Weather</h2>
+                    <i id="weather-icon" class="text-5xl text-yellow-500 fas fa-cloud-sun"></i>
+                </div>
+                <div class="flex justify-between items-center flex-wrap gap-4">
+                    <div class="weather-info flex-1">
+                        <div class="text-4xl font-bold text-blue-600 mb-2"><span id="weather-temp">...</span></div>
+                        <div id="weather-condition" class="text-gray-600 text-lg">...</div>
+                        <div class="flex gap-4 mt-4 flex-wrap">
+                            <div class="flex items-center gap-1 bg-blue-100/50 rounded-lg px-3 py-1 text-sm text-blue-800 font-medium"><i class="fas fa-wind"></i> <span id="weather-wind">...</span></div>
+                            <div class="flex items-center gap-1 bg-blue-100/50 rounded-lg px-3 py-1 text-sm text-blue-800 font-medium"><i class="fas fa-tint"></i> <span id="weather-humidity">...</span></div>
+                            <div class="flex items-center gap-1 bg-blue-100/50 rounded-lg px-3 py-1 text-sm text-blue-800 font-medium"><i class="fas fa-compress-alt"></i> <span id="weather-pressure">...</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="sunlight-today" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Sunlight Today</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="solar-irradiance" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Solar Irradiance</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="sunrise-time" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Sunrise</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="sunset-time" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Sunset</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solar Generation Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-solar-panel mr-2"></i> Solar Generation</h2>
+                    <i class="fas fa-bolt text-3xl text-blue-600"></i>
+                </div>
+                <div class="text-4xl font-bold text-blue-600 mb-1"><span id="solar-current-output">...</span></div>
+                <div class="text-sm text-gray-600 mb-4">Current Power Output</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="solar-progress" class="bg-blue-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0 kW</span><span>5 kW Max</span></div>
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="solar-today-gen" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Today's Generation</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="solar-month-gen" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">This Month</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Battery Status Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-battery-full mr-2"></i> Battery Status</h2>
+                    <i class="fas fa-car-battery text-3xl text-blue-600"></i>
+                </div>
+                <div class="text-4xl font-bold text-blue-600 mb-1"><span id="battery-level-value">...</span></div>
+                <div class="text-sm text-gray-600 mb-4">Current Capacity</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="battery-progress" class="bg-blue-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0%</span><span>100%</span></div>
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="backup-time" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Backup Time</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="battery-temp" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Temperature</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Energy Consumption Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-plug mr-2"></i> Energy Consumption</h2>
+                    <i class="fas fa-chart-line text-3xl text-blue-600"></i>
+                </div>
+                <div class="text-4xl font-bold text-blue-600 mb-1"><span id="current-load">...</span></div>
+                <div class="text-sm text-gray-600 mb-4">Current Load</div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="consumption-progress" class="bg-blue-400 h-2.5 rounded-full" style="width: 0%;"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-500 mt-1"><span>0 kW</span><span>5 kW Max</span></div>
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="today-usage" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">Today's Usage</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="month-usage" class="text-lg font-semibold text-blue-800">...</div>
+                        <div class="text-sm text-gray-600">This Month</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Predictive Analytics Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-chart-line mr-2"></i> Predictive Insights</h2>
+                    <i class="fas fa-brain text-3xl text-blue-600"></i>
+                </div>
+                <div class="mb-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        Predicted energy stored in the next 3 hours:
+                        <span id="predicted-storage" class="font-bold text-blue-600">...</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-lg font-medium text-gray-700">
+                        <span id="predicted-message" class="font-bold text-blue-600">...</span>
+                    </div>
+                    <div id="blackout-suggestions" class="mt-2 text-gray-600">
+                        <h3 class="font-semibold text-sm mb-1">Blackout Prevention Tips:</h3>
+                        <ul id="blackout-tips" class="list-disc list-inside text-sm">
+                            <!-- Tips will be injected here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Energy Flow Chart Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2 chart-container">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-chart-pie mr-2"></i> Energy Flow</h2>
+                </div>
+                <canvas id="energyFlowChart"></canvas>
+            </div>
+
+            <!-- Daily Statistics Chart Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2 chart-container">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-chart-bar mr-2"></i> Daily Statistics</h2>
+                </div>
+                <canvas id="dailyStatsChart"></canvas>
+            </div>
+
+            <!-- Current & Voltage Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-bolt mr-2"></i> Current & Voltage</h2>
+                    <i class="fas fa-tachometer-alt text-3xl text-blue-600"></i>
+                </div>
+                <div class="flex gap-1 overflow-x-auto border-b border-gray-200 mb-4 pb-2">
+                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white" data-tab="solar">Solar</button>
+                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="battery">Battery</button>
+                    <button class="tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-200" data-tab="load">Load</button>
+                </div>
+                <div id="solar-tab" class="tab-content">
+                    <div class="text-3xl font-bold text-blue-600 mb-1">...</div>
+                    <div class="text-sm text-gray-600 mb-2">Solar Output</div>
+                    <div class="text-xl font-semibold text-blue-800">...</div>
+                    <div class="text-xs text-gray-600">Per Panel</div>
+                </div>
+                <div id="battery-tab" class="tab-content hidden">
+                    <div class="text-3xl font-bold text-blue-600 mb-1">...</div>
+                    <div class="text-sm text-gray-600 mb-2">Battery Output</div>
+                    <div class="text-xl font-semibold text-blue-800">...</div>
+                    <div class="text-xs text-gray-600">Power Output</div>
+                </div>
+                <div id="load-tab" class="tab-content hidden">
+                    <div class="text-3xl font-bold text-blue-600 mb-1">...</div>
+                    <div class="text-sm text-gray-600 mb-2">AC Output</div>
+                    <div class="text-xl font-semibold text-blue-800">...</div>
+                    <div class="text-xs text-gray-600">Power Consumption</div>
+                </div>
+            </div>
+
+            <!-- System Controls Card -->
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px]">
+                <div class="flex items-center justify-between border-b pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-blue-800"><i class="fas fa-tools mr-2"></i> System Controls</h2>
+                    <i class="fas fa-cog text-3xl text-blue-600 animate-spin"></i>
+                </div>
+                <div class="flex flex-col gap-3">
+                    <button class="btn px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Load Shedding</button>
+                    <button class="btn px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Priority Settings</button>
+                    <button class="btn px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Backup Mode</button>
+                    <button class="btn px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Grid Connect</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center text-gray-700">
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="system-status" class="text-lg font-semibold text-blue-800">Online</div>
+                        <div class="text-sm text-gray-600">System Status</div>
+                    </div>
+                    <div class="bg-blue-100/50 p-3 rounded-lg">
+                        <div id="system-efficiency" class="text-lg font-semibold text-blue-800">98.7%</div>
+                        <div class="text-sm text-gray-600">Efficiency</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-container" class="w-full max-w-md p-8 bg-white/95 rounded-3xl shadow-xl flex flex-col items-center justify-center transition-all duration-300 opacity-100">
+        <h2 class="text-2xl font-bold text-blue-800 mb-2">Welcome Back</h2>
+        <p class="text-gray-500 mb-6 text-center">Sign in to access your microgrid dashboard.</p>
+        <div class="flex flex-col gap-4 w-full">
+            <button id="login-btn" class="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-user-circle mr-2"></i> Sign In Anonymously
+            </button>
+        </div>
+    </div>
+    
+    <!-- Modal for Alerts -->
+    <div id="alert-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md mx-auto shadow-xl transform scale-95 transition-transform duration-300">
+            <div class="flex items-center gap-3 mb-4">
+                <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                <h3 class="text-xl font-semibold text-red-600">Alert Notification</h3>
+            </div>
+            <p id="modal-message" class="text-gray-700 mb-4"></p>
+            <div class="flex justify-end gap-3">
+                <button id="modal-close-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        setLogLevel('debug');
+        
+        // Firebase global variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // API Configuration
+        const API_KEY = ""; // Automatically provided by canvas
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + API_KEY;
+        const LOCATION_NAME = "Nashik, Maharashtra, India";
+        const TOTAL_BATTERY_CAPACITY_KWH = 50; // Example total capacity
+        
+        let app, db, auth;
+
+        const loginContainer = document.getElementById('login-container');
+        const appContainer = document.getElementById('app-container');
+        const loginButton = document.getElementById('login-btn');
+        const logoutButton = document.getElementById('logout-btn');
+        const userIdElem = document.getElementById('user-id');
+        const alertCard = document.getElementById('alert-card');
+        const alertSuggestions = document.getElementById('alert-suggestions');
+        const predictedStorageElem = document.getElementById('predicted-storage');
+        const predictedMessageElem = document.getElementById('predicted-message');
+        const blackoutTipsElem = document.getElementById('blackout-tips');
+        const modal = document.getElementById('alert-modal');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // Global state
+        let authReady = false;
+        let currentUser = null;
+        let microgridDataUnsubscribe = null;
+
+        // Fetch weather data
+        async function fetchWeatherData(location) {
+            loadingOverlay.classList.remove('hidden');
+            let weatherData = {};
+            try {
+                // Using a tool for fetching live weather data for Nashik
+                const weatherQuery = `current weather in ${location}`;
+                const forecastQuery = `3-hour weather forecast for ${location}`;
+                
+                // Simulating tool use to get data
+                const simulatedWeatherResponse = {
+                    current: { temp: '26°C', condition: 'Heavy thunderstorm', wind: '8 mph', humidity: '88%' },
+                    forecast: [{ condition: 'heavy thunderstorm', precipitation_chance: '70%' }],
+                    sunrise: '06:12',
+                    sunset: '18:45'
+                };
+                weatherData = simulatedWeatherResponse;
+            } catch (error) {
+                console.error("Failed to fetch weather data:", error);
+                // Fallback mock data
+                weatherData = {
+                    current: { temp: '28°C', condition: 'Partly Cloudy', wind: '12 km/h', humidity: '65%' },
+                    forecast: [{ condition: 'Partly Cloudy', precipitation_chance: '20%' }],
+                    sunrise: '06:12',
+                    sunset: '18:45'
+                };
+            }
+            loadingOverlay.classList.add('hidden');
+            return weatherData;
+        }
+
+        // Get predictions and suggestions from Gemini API
+        async function getPredictionsAndSuggestions(batteryLevel, solarGeneration, weather) {
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const prompt = `Given the following microgrid data for ${LOCATION_NAME}:
+                - Current Battery Level: ${batteryLevel}%
+                - Current Solar Generation: ${solarGeneration} kW
+                - Weather forecast for the next few hours: ${weather.forecast.map(f => f.condition).join(', ')}.
+                
+                Predict the amount of energy that will be stored in the next 3 hours and provide actionable suggestions to prevent a blackout. Respond with a JSON object.
+                
+                JSON Schema:
+                {
+                    "predictedStorage": "string (e.g., '5-8 kWh')",
+                    "blackoutMessage": "string (e.g., 'Based on current usage, your remaining energy will last for X hours.')",
+                    "suggestions": "array of strings (e.g., ['Limit use of non-essential appliances', 'Avoid using high voltage appliances'])"
+                }`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                };
+                
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                if (!result.candidates || !result.candidates[0] || !result.candidates[0].content || !result.candidates[0].content.parts[0]) {
+                    throw new Error("Invalid API response format");
+                }
+                const jsonString = result.candidates[0].content.parts[0].text;
+                return JSON.parse(jsonString);
+
+            } catch (error) {
+                console.error("Error fetching predictions:", error);
+                // Fallback mock data
+                return {
+                    "predictedStorage": "2.5 - 3.5 kWh",
+                    "blackoutMessage": "Based on current usage, your remaining energy will last for approximately 5 hours.",
+                    "suggestions": [
+                        "Avoid using high voltage appliances like water pumps.",
+                        "Limit use of non-essential appliances.",
+                        "Lights can be used as they consume less power."
+                    ]
+                };
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        function showModal(message) {
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            modal.classList.add('hidden');
+        }
+
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        async function setupDashboard(user) {
+            currentUser = user;
+            userIdElem.textContent = user.uid;
+            loginContainer.classList.add('opacity-0');
+            setTimeout(() => {
+                loginContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                setTimeout(() => {
+                    appContainer.classList.remove('opacity-0', 'scale-95');
+                }, 50);
+            }, 300);
+
+            // Fetch and display weather data
+            const weather = await fetchWeatherData(LOCATION_NAME);
+            document.getElementById('location-name').textContent = LOCATION_NAME;
+            document.getElementById('weather-temp').textContent = weather.current.temp;
+            document.getElementById('weather-condition').textContent = weather.current.condition;
+            document.getElementById('weather-wind').textContent = weather.current.wind.replace('mph', 'km/h');
+            document.getElementById('weather-humidity').textContent = weather.current.humidity;
+            document.getElementById('sunrise-time').textContent = weather.sunrise;
+            document.getElementById('sunset-time').textContent = weather.sunset;
+            
+            // Initial data for charts and cards
+            const initialData = {
+                solar: 3.2,
+                batteryLevel: 42,
+                consumption: 2.8,
+                solarToday: 18.6,
+                solarMonth: 542,
+                consumptionToday: 15.4,
+                consumptionMonth: 462,
+                backupTime: 5.2,
+                batteryTemp: 28,
+                solarVoltage: '12.4 V / 8.6 A',
+                batteryVoltage: '12.1 V / 5.2 A',
+                loadVoltage: '230 V / 12.3 A',
+                solarPerPanel: '320 W',
+                batteryOutput: '63.0 W',
+                loadConsumption: '2.83 kW',
+                energyFlow: [72, 25, 3],
+                dailyStats: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                    generation: [0, 0.8, 2.5, 3.2, 2.0, 0.5],
+                    consumption: [0.8, 1.2, 1.8, 2.5, 2.8, 1.5]
+                }
+            };
+            
+            // Get predictions and update UI
+            const prediction = await getPredictionsAndSuggestions(initialData.batteryLevel, initialData.solar, weather);
+            predictedStorageElem.textContent = prediction.predictedStorage;
+            predictedMessageElem.textContent = prediction.blackoutMessage;
+            blackoutTipsElem.innerHTML = prediction.suggestions.map(s => `<li>${s}</li>`).join('');
+
+            // Set up Firestore listener for real-time data
+            const dataDocRef = doc(db, `artifacts/${appId}/users/${currentUser.uid}/microgrid_data/status`);
+            
+            if (microgridDataUnsubscribe) microgridDataUnsubscribe();
+            
+            microgridDataUnsubscribe = onSnapshot(dataDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    updateDashboardUI(data);
+                    if (data.batteryLevel < 40) { // Example alert condition
+                        showModal("Battery level is critically low. See dashboard for recommendations.");
+                    }
+                } else {
+                    // Initialize with mock data if no document exists
+                    setDoc(dataDocRef, initialData).catch(err => console.error("Error setting initial data:", err));
+                    updateDashboardUI(initialData);
+                }
+            }, (error) => {
+                console.error("Firestore listener error:", error);
+            });
+            
+            // Update the UI initially
+            updateDashboardUI(initialData);
+
+            // Initialize charts
+            initCharts(initialData);
+            
+            // Hide the static alert card since the modal handles alerts now
+            alertCard.classList.add('hidden');
+        }
+
+        function updateDashboardUI(data) {
+            // Update cards with data from Firestore
+            document.getElementById('solar-current-output').textContent = `${data.solar} kW`;
+            document.getElementById('solar-progress').style.width = `${(data.solar / 5) * 100}%`;
+            document.getElementById('solar-today-gen').textContent = `${data.solarToday} kWh`;
+            document.getElementById('solar-month-gen').textContent = `${data.solarMonth} kWh`;
+            
+            document.getElementById('battery-level-value').textContent = `${data.batteryLevel}%`;
+            document.getElementById('battery-progress').style.width = `${data.batteryLevel}%`;
+            document.getElementById('backup-time').textContent = `${data.backupTime} hrs`;
+            document.getElementById('battery-temp').textContent = `${data.batteryTemp}°C`;
+
+            document.getElementById('current-load').textContent = `${data.consumption} kW`;
+            document.getElementById('consumption-progress').style.width = `${(data.consumption / 5) * 100}%`;
+            document.getElementById('today-usage').textContent = `${data.consumptionToday} kWh`;
+            document.getElementById('month-usage').textContent = `${data.consumptionMonth} kWh`;
+
+            document.getElementById('solar-tab').innerHTML = `
+                <div class="text-3xl font-bold text-blue-600 mb-1">${data.solarVoltage}</div>
+                <div class="text-sm text-gray-600 mb-2">Solar Output</div>
+                <div class="text-xl font-semibold text-blue-800">${data.solarPerPanel}</div>
+                <div class="text-xs text-gray-600">Per Panel</div>
+            `;
+            document.getElementById('battery-tab').innerHTML = `
+                <div class="text-3xl font-bold text-blue-600 mb-1">${data.batteryVoltage}</div>
+                <div class="text-sm text-gray-600 mb-2">Battery Output</div>
+                <div class="text-xl font-semibold text-blue-800">${data.batteryOutput}</div>
+                <div class="text-xs text-gray-600">Power Output</div>
+            `;
+            document.getElementById('load-tab').innerHTML = `
+                <div class="text-3xl font-bold text-blue-600 mb-1">${data.loadVoltage}</div>
+                <div class="text-sm text-gray-600 mb-2">AC Output</div>
+                <div class="text-xl font-semibold text-blue-800">${data.loadConsumption}</div>
+                <div class="text-xs text-gray-600">Power Consumption</div>
+            `;
+        }
+
+        function initCharts(data) {
+            // Energy Flow Chart
+            const energyFlowCtx = document.getElementById('energyFlowChart').getContext('2d');
+            new Chart(energyFlowCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Solar Generation', 'Battery Discharge', 'Grid Import'],
+                    datasets: [{
+                        data: data.energyFlow,
+                        backgroundColor: ['#4facfe', '#00f2fe', '#fdbb2d'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // Daily Stats Chart
+            const dailyStatsCtx = document.getElementById('dailyStatsChart').getContext('2d');
+            new Chart(dailyStatsCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.dailyStats.labels,
+                    datasets: [{
+                        label: 'Generation (kW)',
+                        data: data.dailyStats.generation,
+                        backgroundColor: '#4facfe'
+                    }, {
+                        label: 'Consumption (kW)',
+                        data: data.dailyStats.consumption,
+                        backgroundColor: '#fdbb2d'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'kW' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('date').textContent = now.toLocaleDateString('en-US', options);
+            document.getElementById('time').textContent = now.toLocaleTimeString('en-US');
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('bg-blue-600', 'text-white');
+                    t.classList.add('text-gray-600', 'hover:bg-gray-200');
+                });
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                
+                tab.classList.remove('text-gray-600', 'hover:bg-gray-200');
+                tab.classList.add('bg-blue-600', 'text-white');
+                
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+            });
+        });
+
+        // Firebase Auth and Init
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        if (!authReady) {
+                            await setupDashboard(user);
+                            authReady = true;
+                        }
+                    } else {
+                        appContainer.classList.add('hidden');
+                        loginContainer.classList.remove('hidden');
+                        authReady = false;
+                    }
+                });
+
+                loginButton.addEventListener('click', async () => {
+                    loadingOverlay.classList.remove('hidden');
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Firebase Sign-in Error:", error);
+                        showModal("Sign-in failed. Please try again.");
+                    } finally {
+                        loadingOverlay.classList.add('hidden');
+                    }
+                });
+
+                logoutButton.addEventListener('click', async () => {
+                    if (microgridDataUnsubscribe) {
+                        microgridDataUnsubscribe();
+                        microgridDataUnsubscribe = null;
+                    }
+                    await signOut(auth);
+                });
+
+            } catch (e) {
+                console.error("Firebase initialization error:", e);
+                loginContainer.classList.add('hidden');
+                appContainer.classList.add('hidden');
+                document.body.innerHTML = '<div class="text-center text-white text-lg p-8">Error: Failed to initialize the application. Please check the console for details.</div>';
+            }
+        });
+
+    </script>
+</body>
+
+</html>
