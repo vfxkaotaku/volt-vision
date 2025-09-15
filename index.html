@@ -77,7 +77,7 @@
                 <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
                 <h2 class="text-xl font-semibold text-red-600">Low Battery Alert</h2>
             </div>
-            <p class="text-gray-700 leading-relaxed mb-4">Battery level is at <span id="alert-battery-level">42%</span>. To prevent a blackout, please follow these suggestions:</p>
+            <p class="text-gray-700 leading-relaxed mb-4">Battery level is at <span id="alert-battery-level">...</span>. To prevent a blackout, please follow these suggestions:</p>
             <ul id="alert-suggestions" class="list-disc list-inside text-gray-600 leading-snug">
                 <!-- Suggestions will be injected here -->
             </ul>
@@ -221,7 +221,7 @@
             </div>
 
             <!-- Energy Flow Chart Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2 chart-container">
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2">
                 <div class="flex items-center justify-between border-b pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-chart-pie mr-2"></i> Energy Flow</h2>
                 </div>
@@ -229,7 +229,7 @@
             </div>
 
             <!-- Daily Statistics Chart Card -->
-            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2 chart-container">
+            <div class="card bg-white/95 rounded-2xl p-6 shadow-lg transition-transform duration-300 hover:translate-y-[-5px] col-span-2">
                 <div class="flex items-center justify-between border-b pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-green-800"><i class="fas fa-chart-bar mr-2"></i> Daily Statistics</h2>
                 </div>
@@ -304,10 +304,9 @@
         // Global state
         const LOCATION_NAME = "Nashik, Maharashtra, India";
         const TOTAL_BATTERY_CAPACITY_KWH = 50;
-        const MCU_IP_ADDRESS = "http://192.168.1.100/data"; // REPLACE WITH YOUR MICROCONTROLLER'S IP
 
         function updateDashboardUI(data) {
-            // Update cards with data from live source
+            // Update cards with data from local storage
             document.getElementById('solar-current-output').textContent = `${data.solar} kW`;
             document.getElementById('solar-progress').style.width = `${(data.solar / 5) * 100}%`;
             document.getElementById('solar-today-gen').textContent = `${data.solarToday} kWh`;
@@ -402,86 +401,81 @@
             document.getElementById('last-updated').textContent = now.toLocaleTimeString('en-US');
         }
         
-        async function fetchAndDisplayData() {
-            loadingOverlay.classList.remove('hidden');
-            try {
-                const response = await fetch(MCU_IP_ADDRESS);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const liveData = await response.json();
-
-                // Placeholder data for other metrics not provided by MCU
-                const mockData = {
+        function loadData() {
+            let data = localStorage.getItem('microgridData');
+            if (data) {
+                data = JSON.parse(data);
+            } else {
+                // Initial default data if local storage is empty
+                data = {
+                    solar: 3.2,
+                    batteryLevel: 42,
+                    consumption: 2.8,
                     solarToday: 18.6,
                     solarMonth: 542,
                     consumptionToday: 15.4,
                     consumptionMonth: 462,
-                    backupTime: ((liveData.batteryLevel / 100) * 5.2).toFixed(1),
-                    batteryTemp: liveData.weather.temp.replace('°C', ''),
+                    backupTime: 5.2,
+                    batteryTemp: 28,
                     solarVoltage: '12.4 V / 8.6 A',
                     batteryVoltage: '12.1 V / 5.2 A',
                     loadVoltage: '230 V / 12.3 A',
                     solarPerPanel: '320 W',
                     batteryOutput: '63.0 W',
                     loadConsumption: '2.83 kW',
-                    energyFlow: [Math.round((liveData.solar / (liveData.solar + liveData.consumption)) * 100), 100 - Math.round((liveData.solar / (liveData.solar + liveData.consumption)) * 100), 0],
+                    energyFlow: [72, 25, 3],
                     dailyStats: {
                         labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-                        generation: [0, 0.8, 2.5, liveData.solar, 2.0, 0.5],
-                        consumption: [0.8, 1.2, 1.8, liveData.consumption, 2.8, 1.5]
+                        generation: [0, 0.8, 2.5, 3.2, 2.0, 0.5],
+                        consumption: [0.8, 1.2, 1.8, 2.5, 2.8, 1.5]
                     },
-                    predictedStorage: `${(liveData.solar * 3).toFixed(1)} kWh`,
-                    predictedMessage: `At this rate, your energy will last for approximately ${((liveData.batteryLevel / 100) * 5.2).toFixed(1)} hours.`,
-                    suggestions: (liveData.batteryLevel < 40) ? ["Limit high-power devices.", "Turn off non-essential lights."] : ["All systems are normal.", "Continue to monitor for changes."],
+                    weather: {
+                        temp: '28°C', condition: 'Partly Cloudy', wind: '12 km/h', humidity: '65%',
+                        sunlight: '6.2 hrs', irradiance: '4.2 kWh/m²', sunrise: '06:12', sunset: '18:45'
+                    },
+                    predictedStorage: "2.5 - 3.5 kWh",
+                    predictedMessage: "Based on current usage, your remaining energy will last for approximately 5 hours.",
+                    suggestions: ["Avoid using high voltage appliances like water pumps.", "Limit use of non-essential appliances.", "Lights can be used as they consume less power."]
                 };
-                
-                const combinedData = { ...liveData, ...mockData };
-
-                updateDashboardUI(combinedData);
-
-                document.getElementById('location-name').textContent = LOCATION_NAME;
-                document.getElementById('weather-temp').textContent = liveData.weather.temp;
-                document.getElementById('weather-condition').textContent = liveData.weather.condition;
-                document.getElementById('weather-wind').textContent = liveData.weather.wind;
-                document.getElementById('weather-humidity').textContent = liveData.weather.humidity;
-                document.getElementById('sunlight-today').textContent = mockData.sunlight;
-                document.getElementById('solar-irradiance').textContent = mockData.irradiance;
-                document.getElementById('sunrise-time').textContent = mockData.sunrise;
-                document.getElementById('sunset-time').textContent = mockData.sunset;
-                
-                predictedStorageElem.textContent = mockData.predictedStorage;
-                predictedMessageElem.textContent = mockData.predictedMessage;
-                blackoutTipsElem.innerHTML = mockData.suggestions.map(s => `<li>${s}</li>`).join('');
-
-                if (liveData.batteryLevel < 40) {
-                    alertCard.classList.remove('hidden');
-                    document.getElementById('alert-battery-level').textContent = `${liveData.batteryLevel}%`;
-                    document.getElementById('alert-suggestions').innerHTML = mockData.suggestions.map(s => `<li>${s}</li>`).join('');
-                } else {
-                    alertCard.classList.add('hidden');
-                }
-                
-                initCharts(combinedData);
-
-            } catch (error) {
-                console.error("Failed to fetch data from microcontroller:", error);
-                // Fallback to static data in case of connection failure
-                const staticData = {
-                    solar: 3.2, batteryLevel: 42, consumption: 2.8, solarToday: 18.6, solarMonth: 542, consumptionToday: 15.4, consumptionMonth: 462, backupTime: 5.2, batteryTemp: 28, solarVoltage: '12.4 V / 8.6 A', batteryVoltage: '12.1 V / 5.2 A', loadVoltage: '230 V / 12.3 A', solarPerPanel: '320 W', batteryOutput: '63.0 W', loadConsumption: '2.83 kW', energyFlow: [72, 25, 3], dailyStats: { labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'], generation: [0, 0.8, 2.5, 3.2, 2.0, 0.5], consumption: [0.8, 1.2, 1.8, 2.5, 2.8, 1.5] }, weather: { temp: '28°C', condition: 'Partly Cloudy', wind: '12 km/h', humidity: '65%', sunlight: '6.2 hrs', irradiance: '4.2 kWh/m²', sunrise: '06:12', sunset: '18:45' }, predictedStorage: "2.5 - 3.5 kWh", predictedMessage: "Based on current usage, your remaining energy will last for approximately 5 hours.", suggestions: ["Avoid using high voltage appliances like water pumps.", "Limit use of non-essential appliances.", "Lights can be used as they consume less power."]
-                };
-                updateDashboardUI(staticData);
-                initCharts(staticData);
-            } finally {
-                loadingOverlay.classList.add('hidden');
             }
+            updateDashboardUI(data);
+
+            // Update weather card
+            document.getElementById('location-name').textContent = LOCATION_NAME;
+            document.getElementById('weather-temp').textContent = data.weather.temp;
+            document.getElementById('weather-condition').textContent = data.weather.condition;
+            document.getElementById('weather-wind').textContent = data.weather.wind;
+            document.getElementById('weather-humidity').textContent = data.weather.humidity;
+            document.getElementById('sunlight-today').textContent = data.weather.sunlight;
+            document.getElementById('solar-irradiance').textContent = data.weather.irradiance;
+            document.getElementById('sunrise-time').textContent = data.weather.sunrise;
+            document.getElementById('sunset-time').textContent = data.weather.sunset;
+            
+            // Update predictive analytics
+            predictedStorageElem.textContent = data.predictedStorage;
+            predictedMessageElem.textContent = data.predictedMessage;
+            blackoutTipsElem.innerHTML = data.suggestions.map(s => `<li>${s}</li>`).join('');
+
+            // Hide or show alert card based on battery level
+            if (data.batteryLevel < 40) {
+                alertCard.classList.remove('hidden');
+                document.getElementById('alert-battery-level').textContent = `${data.batteryLevel}%`;
+                document.getElementById('alert-suggestions').innerHTML = data.suggestions.map(s => `<li>${s}</li>`).join('');
+            } else {
+                alertCard.classList.add('hidden');
+            }
+
+            // Initialize or re-initialize charts
+            initCharts(data);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchAndDisplayData();
+            loadData();
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            setInterval(fetchAndDisplayData, 5000); // Fetch new data every 5 seconds
+            
+            // Periodically check local storage for updates
+            setInterval(loadData, 5000);
 
             // Tab functionality
             document.querySelectorAll('.tab').forEach(tab => {
@@ -500,6 +494,7 @@
                 });
             });
         });
+
     </script>
 </body>
 
