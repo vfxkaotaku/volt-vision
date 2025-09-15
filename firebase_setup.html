@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Setup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const statusElem = document.getElementById('status');
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                // Sign in anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                const weatherData = {
+                    location: "Nashik, Maharashtra, India",
+                    temp: "28°C",
+                    condition: "Partly Cloudy",
+                    wind: "12 km/h",
+                    humidity: "65%",
+                    sunlight: "6.2 hrs",
+                    irradiance: "4.2 kWh/m²",
+                    sunrise: "06:12",
+                    sunset: "18:45"
+                };
+
+                const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
+                await setDoc(weatherDocRef, weatherData);
+
+                statusElem.textContent = 'Success! Weather data has been uploaded to Firebase. You can now close this tab.';
+                statusElem.classList.remove('text-gray-500');
+                statusElem.classList.add('text-green-600', 'font-semibold');
+
+            } catch (e) {
+                console.error('Firebase setup failed:', e);
+                statusElem.textContent = 'Error: Failed to set up Firebase. Please check the console for details.';
+                statusElem.classList.remove('text-gray-500');
+                statusElem.classList.add('text-red-600', 'font-semibold');
+            }
+        });
+    </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="p-8 max-w-sm mx-auto bg-white rounded-xl shadow-lg space-y-2 text-center">
+        <h1 class="text-xl font-bold text-gray-900">Firebase Setup</h1>
+        <p id="status" class="text-gray-500">Initializing Firebase and uploading data...</p>
+    </div>
+</body>
+</html>
