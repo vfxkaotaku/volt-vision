@@ -271,7 +271,35 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Login Page -->
+    <div id="login-page" class="flex flex-col items-center justify-center min-h-screen p-4" style="background: linear-gradient(135deg, var(--dark), var(--primary), var(--secondary));">
+        <div class="glass-card p-8 w-full max-w-sm text-center">
+            <i class="fas fa-bolt text-5xl text-yellow-500 mb-4"></i>
+            <h1 class="font-bold text-3xl text-green-800 mb-2">Volt Vision</h1>
+            <p class="text-sm text-green-600 mb-8">Login to your Microgrid Dashboard</p>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="contact" class="block text-left text-sm font-medium text-gray-700 mb-2">Email or Phone Number</label>
+                    <input type="text" id="contact" name="contact" placeholder="Enter your email or phone" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                </div>
+                <div class="mb-6">
+                    <label for="plant-type" class="block text-left text-sm font-medium text-gray-700 mb-2">My Power Plant Type</label>
+                    <select id="plant-type" name="plant-type" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                        <option value="" disabled selected>Select a plant type</option>
+                        <option value="Solar">Solar Panels</option>
+                        <option value="Wind">Wind Turbine</option>
+                        <option value="Hybrid">Hybrid (Solar & Wind)</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition">
+                    Login
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard - Initially hidden -->
+    <div id="main-dashboard" class="container hidden">
         <!-- Header -->
         <header class="glass-card p-5 md:p-6 shadow-lg mb-6">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -335,7 +363,7 @@
         <div id="dashboard-panel" class="panel active">
             <div class="dashboard-grid">
                 <!-- Live Status & Energy Source Card (Spans 2 columns) -->
-                <div class="glass-card p-6 col-span-2-lg flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="glass-card p-6 col-span-full lg:col-span-2 flex flex-col md:flex-row items-center justify-between gap-6">
                     <!-- Status -->
                     <div>
                         <h2 class="text-lg md:text-xl font-semibold text-green-800 flex items-center gap-2 mb-2">
@@ -364,7 +392,7 @@
                 </div>
 
                 <!-- AI Prediction Card (Spans 2 columns) -->
-                <div class="glass-card relative col-span-2-lg p-6">
+                <div class="glass-card relative col-span-full lg:col-span-2 p-6">
                     <span class="notification-badge">AI</span>
                     <h2 class="text-lg md:text-xl font-semibold text-green-800 flex items-center gap-2 mb-4">
                         <i class="fas fa-brain"></i> AI Energy Prediction
@@ -393,7 +421,7 @@
                 </div>
 
                 <!-- Full-Width Weather Report Card -->
-                <div class="glass-card col-span-4-lg p-6">
+                <div class="glass-card col-span-full p-6">
                     <h2 class="text-lg md:text-xl font-semibold text-green-800 flex items-center gap-2 mb-4">
                         <i class="fas fa-cloud-sun"></i> Live Weather Report
                     </h2>
@@ -435,7 +463,7 @@
                 </div>
                 
                 <!-- Solar Generation Card -->
-                <div class="glass-card p-6">
+                <div id="solar-card" class="glass-card p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h2 class="text-lg font-semibold text-green-800 flex items-center gap-2">
                             <i class="fas fa-solar-panel text-yellow-500"></i> Solar
@@ -453,6 +481,32 @@
                     </div>
                     <div class="progress-bar-container">
                         <div id="solar-progress" class="progress-bar bg-yellow-500" style="width: 64%;"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <span>0 kW</span>
+                        <span>5 kW Max</span>
+                    </div>
+                </div>
+
+                <!-- Wind Generation Card -->
+                <div id="wind-card" class="glass-card p-6 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-green-800 flex items-center gap-2">
+                            <i class="fas fa-wind text-blue-500"></i> Wind
+                        </h2>
+                        <div class="text-sm text-gray-600 flex items-center gap-1">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="font-medium" id="wind-today-gen">18.6 kWh Today</span>
+                        </div>
+                    </div>
+                    <div class="text-center mb-4">
+                        <div class="data-value text-blue-600">
+                            <span id="wind-current-output">3.2</span> <span class="text-xl">kW</span>
+                        </div>
+                        <div class="data-label">Current Output</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="wind-progress" class="progress-bar bg-blue-500" style="width: 64%;"></div>
                     </div>
                     <div class="flex justify-between text-xs text-gray-500 mt-2">
                         <span>0 kW</span>
@@ -554,10 +608,15 @@
                 <div class="flex flex-col items-center justify-center h-[500px] relative">
                     <!-- Energy sources -->
                     <div class="flex w-full justify-around items-center">
-                        <div class="flex flex-col items-center">
+                        <div id="flow-source-1" class="flex flex-col items-center">
                             <div class="text-4xl text-yellow-500"><i class="fas fa-solar-panel"></i></div>
-                            <div class="mt-2 font-semibold text-sm">Solar Panels</div>
+                            <div class="mt-2 font-semibold text-sm" id="flow-source-1-label">Solar Panels</div>
                             <div id="flow-solar-output" class="text-xs text-gray-500">3.2 kW</div>
+                        </div>
+                        <div id="flow-source-2" class="flex flex-col items-center hidden">
+                            <div class="text-4xl text-blue-500"><i class="fas fa-wind"></i></div>
+                            <div class="mt-2 font-semibold text-sm" id="flow-source-2-label">Wind Turbine</div>
+                            <div id="flow-wind-output" class="text-xs text-gray-500">3.2 kW</div>
                         </div>
                         <div class="flex flex-col items-center">
                             <div class="text-4xl text-blue-500"><i class="fas fa-warehouse"></i></div>
@@ -602,6 +661,9 @@
                             <path d="M80 30 C 80 45, 60 45, 60 50" fill="transparent" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead-blue)" id="battery-to-home-path" class="hidden"></path>
                              <!-- Solar to Grid (Selling) -->
                             <path d="M20 30 C 20 15, 50 15, 50 20" fill="transparent" stroke="#d32f2f" stroke-width="2" marker-end="url(#arrowhead-red)" id="solar-to-grid-path" class="hidden"></path>
+                            
+                            <!-- Wind specific paths (only active for wind or hybrid) -->
+                            <path d="M20 30 C 20 45, 45 45, 45 50" fill="transparent" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead-blue)" id="wind-to-home-path" class="hidden"></path>
                         </svg>
                     </div>
                 </div>
@@ -613,12 +675,12 @@
             <div class="glass-card p-6">
                 <h2 class="text-2xl font-bold text-green-800 mb-4">7-Day Weather & Solar Forecast</h2>
                 <div class="dashboard-grid gap-6">
-                    <div class="col-span-4-lg">
+                    <div class="col-span-full">
                         <div class="w-full h-80 bg-gray-50 rounded-lg p-4">
                             <canvas id="solar-forecast-chart"></canvas>
                         </div>
                     </div>
-                    <div class="col-span-4-lg grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                    <div class="col-span-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                         <!-- Forecast Card -->
                         <div class="bg-green-50 p-4 rounded-xl text-center">
                             <div class="text-xs text-gray-500 font-medium">Today</div>
@@ -686,15 +748,15 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
                         <div>
                             <div class="text-gray-500 text-sm">Today's Generation</div>
-                            <div class="text-2xl font-bold text-yellow-600">18.6 kWh</div>
+                            <div class="text-2xl font-bold text-yellow-600" id="analytics-gen">18.6 kWh</div>
                         </div>
                         <div>
                             <div class="text-gray-500 text-sm">Today's Consumption</div>
-                            <div class="text-2xl font-bold text-blue-600">15.4 kWh</div>
+                            <div class="text-2xl font-bold text-blue-600" id="analytics-con">15.4 kWh</div>
                         </div>
                         <div>
                             <div class="text-gray-500 text-sm">Net Surplus</div>
-                            <div class="text-2xl font-bold text-green-600">3.2 kWh</div>
+                            <div class="text-2xl font-bold text-green-600" id="analytics-surplus">3.2 kWh</div>
                         </div>
                     </div>
                 </div>
@@ -806,6 +868,16 @@
         </div>
     </div>
 
+    <!-- Simple message modal for login alerts -->
+    <div id="message-modal-container" class="hidden">
+        <div class="modal-overlay"></div>
+        <div class="trade-alert-modal">
+            <h3 class="text-xl font-bold text-green-800 mb-2">Attention!</h3>
+            <p class="text-sm text-gray-700 mb-4" id="message-modal-text">Please fill out all fields to log in.</p>
+            <button id="message-modal-close" class="w-full py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 transition">OK</button>
+        </div>
+    </div>
+
     <script>
         // Global state for trading
         const tradeState = {
@@ -820,19 +892,156 @@
 
         // Data and UI management script
         document.addEventListener('DOMContentLoaded', () => {
+            const loginPage = document.getElementById('login-page');
+            const mainDashboard = document.getElementById('main-dashboard');
+            const loginForm = document.getElementById('login-form');
+            
             // New Trading Panel Functionality
             const transactionHistoryEl = document.getElementById('transaction-history');
             const tradeAlertContainer = document.getElementById('trade-alert-container');
             const acceptTradeBtn = document.getElementById('accept-trade-btn');
             const declineTradeBtn = document.getElementById('decline-trade-btn');
+            const messageModalContainer = document.getElementById('message-modal-container');
+            const messageModalText = document.getElementById('message-modal-text');
+            const messageModalCloseBtn = document.getElementById('message-modal-close');
             let tradeAlertTimeout;
+            let currentPlantType = ''; // To store the selected plant type
+            
+            // Chart variables
+            let predictionChart, weeklyConsumptionChart, usageBreakdownChart, solarForecastChart;
 
-            // Initial UI update for trading panel
-            document.getElementById('client-id').textContent = tradeState.clientId;
-            document.getElementById('energy-balance').textContent = `₹ ${tradeState.balance.toFixed(2)}`;
-            renderTransactionHistory();
+            // Custom alert function
+            function showAlert(message) {
+                if (!messageModalContainer || !messageModalText || !messageModalCloseBtn) return;
+                
+                messageModalText.textContent = message;
+                messageModalContainer.classList.remove('hidden');
+                messageModalCloseBtn.onclick = () => {
+                    messageModalContainer.classList.add('hidden');
+                };
+            }
+
+            // Handle login form submission
+            loginForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const contact = document.getElementById('contact').value;
+                currentPlantType = document.getElementById('plant-type').value;
+
+                if (contact && currentPlantType) {
+                    localStorage.setItem('contact', contact);
+                    localStorage.setItem('plantType', currentPlantType);
+                    loginPage.classList.add('hidden');
+                    mainDashboard.classList.remove('hidden');
+                    initializeDashboard();
+                } else {
+                    showAlert('Please enter your email or phone number and select a plant type.');
+                }
+            });
+
+            // Check if user is already logged in
+            if (localStorage.getItem('contact')) {
+                loginPage.classList.add('hidden');
+                mainDashboard.classList.remove('hidden');
+                currentPlantType = localStorage.getItem('plantType');
+                initializeDashboard();
+            }
+
+            function initializeDashboard() {
+                // Initial UI update for trading panel
+                const clientIdEl = document.getElementById('client-id');
+                if (clientIdEl) clientIdEl.textContent = tradeState.clientId;
+                
+                const energyBalanceEl = document.getElementById('energy-balance');
+                if (energyBalanceEl) energyBalanceEl.textContent = `₹ ${tradeState.balance.toFixed(2)}`;
+                
+                renderTransactionHistory();
+                updatePlantUI();
+
+                // Re-initialize charts and add event listeners on dashboard load
+                initCharts();
+                updateLiveMetrics();
+                setInterval(updateLiveMetrics, 5000);
+
+                // Panel Navigation
+                const tabs = document.querySelectorAll('.nav-tab');
+                const panels = document.querySelectorAll('.panel');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const panelId = tab.getAttribute('data-panel') + '-panel';
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        panels.forEach(p => p.classList.remove('active'));
+                        
+                        const activePanel = document.getElementById(panelId);
+                        if (activePanel) activePanel.classList.add('active');
+                        
+                        // Re-render charts and trigger trading alerts when their panel becomes active
+                        if (panelId === 'analytics-panel' && weeklyConsumptionChart) {
+                            weeklyConsumptionChart.update();
+                            usageBreakdownChart.update();
+                        } else if (panelId === 'weather-panel' && solarForecastChart) {
+                            solarForecastChart.update();
+                        } else if (panelId === 'trading-panel') {
+                            startTradeAlerts();
+                        }
+                    });
+                });
+            }
+
+            function updatePlantUI() {
+                const sourceIconEl = document.getElementById('source-icon');
+                const sourceMainLabelEl = document.getElementById('source-main-label');
+                const sourceSubLabelEl = document.getElementById('source-sub-label');
+                const solarCard = document.getElementById('solar-card');
+                const windCard = document.getElementById('wind-card');
+
+                if (solarCard) solarCard.classList.add('hidden');
+                if (windCard) windCard.classList.add('hidden');
+                
+                let icon, mainLabel, subLabel;
+
+                switch (currentPlantType) {
+                    case 'Solar':
+                        icon = 'fas fa-solar-panel';
+                        mainLabel = 'Powering from Solar';
+                        subLabel = 'Your home is using clean energy from the sun.';
+                        if (solarCard) solarCard.classList.remove('hidden');
+                        break;
+                    case 'Wind':
+                        icon = 'fas fa-wind';
+                        mainLabel = 'Powering from Wind';
+                        subLabel = 'Your home is using energy generated by wind.';
+                        if (windCard) windCard.classList.remove('hidden');
+                        break;
+                    case 'Hybrid':
+                        icon = 'fas fa-cloud-sun-wind';
+                        mainLabel = 'Powering from Solar & Wind';
+                        subLabel = 'Your home is using a combination of solar and wind energy.';
+                        if (solarCard) solarCard.classList.remove('hidden'); // Show solar for hybrid
+                        if (windCard) windCard.classList.remove('hidden'); // Show wind for hybrid
+                        break;
+                    default:
+                        icon = 'fas fa-question-circle';
+                        mainLabel = 'Unknown Source';
+                        subLabel = 'Please select your plant type.';
+                        break;
+                }
+
+                if (sourceIconEl) {
+                    sourceIconEl.innerHTML = `<i class="${icon}"></i>`;
+                }
+                if (sourceMainLabelEl) {
+                    sourceMainLabelEl.textContent = mainLabel;
+                }
+                if (sourceSubLabelEl) {
+                    sourceSubLabelEl.textContent = subLabel;
+                }
+            }
+
 
             function renderTransactionHistory() {
+                if (!transactionHistoryEl) return;
+
                 transactionHistoryEl.innerHTML = '';
                 tradeState.history.forEach(trade => {
                     const iconClass = trade.type === 'sold' ? 'fa-arrow-down text-red-500' : 'fa-arrow-up text-green-500';
@@ -852,7 +1061,10 @@
 
             function updateBalance(amount) {
                 tradeState.balance += amount;
-                document.getElementById('energy-balance').textContent = `₹ ${tradeState.balance.toFixed(2)}`;
+                const energyBalanceEl = document.getElementById('energy-balance');
+                if (energyBalanceEl) {
+                    energyBalanceEl.textContent = `₹ ${tradeState.balance.toFixed(2)}`;
+                }
             }
 
             function addTransaction(type, quantity, toFrom) {
@@ -867,133 +1079,157 @@
                 }
                 renderTransactionHistory();
             }
-
-            // Panel Navigation
-            const tabs = document.querySelectorAll('.nav-tab');
-            const panels = document.querySelectorAll('.panel');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const panelId = tab.getAttribute('data-panel') + '-panel';
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    panels.forEach(p => p.classList.remove('active'));
-                    document.getElementById(panelId).classList.add('active');
-                    
-                    // Re-render charts and trigger trading alerts when their panel becomes active
-                    if (panelId === 'analytics-panel') {
-                        weeklyConsumptionChart.update();
-                        usageBreakdownChart.update();
-                    } else if (panelId === 'weather-panel') {
-                        solarForecastChart.update();
-                    } else if (panelId === 'trading-panel') {
-                        startTradeAlerts();
-                    }
-                });
-            });
-
-            // Chart Initialization (Moved outside of functions for wider scope)
-            const predictionCtx = document.getElementById('generation-prediction-chart').getContext('2d');
-            const predictionChart = new Chart(predictionCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
-                    datasets: [{
-                        label: 'Predicted Generation (kW)',
-                        data: [4.1, 4.5, 4.2, 3.1, 1.8, 0.5],
-                        borderColor: '#4caf50',
-                        backgroundColor: (context) => {
-                            const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 120);
-                            gradient.addColorStop(0, 'rgba(76, 175, 80, 0.4)');
-                            gradient.addColorStop(1, 'rgba(76, 175, 80, 0)');
-                            return gradient;
-                        },
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 3,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#4caf50'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Generation: ${context.raw.toFixed(1)} kW` } } }, scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
-            });
             
-            // Analytics Charts
-            const weeklyConsumptionCtx = document.getElementById('weekly-consumption-chart').getContext('2d');
-            const weeklyConsumptionChart = new Chart(weeklyConsumptionCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                    datasets: [{
-                        label: 'Consumption (kWh)',
-                        data: [12, 15, 14, 18, 16, 20, 19],
-                        backgroundColor: '#3b82f6',
-                        borderRadius: 5
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
-            });
+            // Chart Initialization function
+            function initCharts() {
+                const predictionCtx = document.getElementById('generation-prediction-chart');
+                if (predictionCtx) {
+                    predictionChart = new Chart(predictionCtx.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: ['1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
+                            datasets: [{
+                                label: 'Predicted Generation (kW)',
+                                data: [4.1, 4.5, 4.2, 3.1, 1.8, 0.5],
+                                borderColor: '#4caf50',
+                                backgroundColor: (context) => {
+                                    const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 120);
+                                    gradient.addColorStop(0, 'rgba(76, 175, 80, 0.4)');
+                                    gradient.addColorStop(1, 'rgba(76, 175, 80, 0)');
+                                    return gradient;
+                                },
+                                fill: true,
+                                tension: 0.4,
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#4caf50'
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Generation: ${context.raw.toFixed(1)} kW` } } }, scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
+                    });
+                }
+                
+                // Analytics Charts
+                const weeklyConsumptionCtx = document.getElementById('weekly-consumption-chart');
+                if (weeklyConsumptionCtx) {
+                    weeklyConsumptionChart = new Chart(weeklyConsumptionCtx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            datasets: [{
+                                label: 'Consumption (kWh)',
+                                data: [12, 15, 14, 18, 16, 20, 19],
+                                backgroundColor: '#3b82f6',
+                                borderRadius: 5
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+                    });
+                }
 
-            const usageBreakdownCtx = document.getElementById('usage-breakdown-chart').getContext('2d');
-            const usageBreakdownChart = new Chart(usageBreakdownCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['HVAC', 'Appliances', 'Lighting', 'Electronics'],
-                    datasets: [{
-                        data: [45, 30, 15, 10],
-                        backgroundColor: ['#d32f2f', '#f57c00', '#4caf50', '#10b981'],
-                        hoverOffset: 4
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-            });
-
-            // Weather Forecast Chart
-            const solarForecastCtx = document.getElementById('solar-forecast-chart').getContext('2d');
-            const solarForecastChart = new Chart(solarForecastCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
-                    datasets: [{
-                        label: 'Solar Generation Forecast (kWh)',
-                        data: [18.6, 15, 12, 16, 22, 10, 21],
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
-            });
+                const usageBreakdownCtx = document.getElementById('usage-breakdown-chart');
+                if (usageBreakdownCtx) {
+                    usageBreakdownChart = new Chart(usageBreakdownCtx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['HVAC', 'Appliances', 'Lighting', 'Electronics'],
+                            datasets: [{
+                                data: [45, 30, 15, 10],
+                                backgroundColor: ['#d32f2f', '#f57c00', '#4caf50', '#10b981'],
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+                    });
+                }
+                // Weather Forecast Chart
+                const solarForecastCtx = document.getElementById('solar-forecast-chart');
+                if (solarForecastCtx) {
+                    solarForecastChart = new Chart(solarForecastCtx.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+                            datasets: [{
+                                label: 'Solar Generation Forecast (kWh)',
+                                data: [18.6, 15, 12, 16, 22, 10, 21],
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+                    });
+                }
+            }
 
 
             // Live Data Simulation Function
             const updateLiveMetrics = () => {
                 const now = new Date();
-                document.getElementById('last-updated').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const lastUpdatedEl = document.getElementById('last-updated');
+                if (lastUpdatedEl) {
+                    lastUpdatedEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                }
 
                 // Simulate data
                 const currentLoad = parseFloat((Math.random() * 4 + 1).toFixed(1));
-                const solarOutput = parseFloat((Math.random() * 5).toFixed(1));
-                const batteryLevel = Math.max(0, Math.min(100, parseFloat(document.getElementById('battery-level-value').textContent) + (Math.random() - 0.5) * 5)).toFixed(0);
-                const efficiencyScore = Math.max(75, Math.min(98, parseInt(document.getElementById('energy-efficiency-score').textContent) + (Math.random() * 4 - 2)));
-                const carbonSaved = (parseFloat(document.getElementById('solar-today-gen').textContent) * 0.5).toFixed(1);
+                let solarOutput = 0, windOutput = 0;
+                
+                switch(currentPlantType) {
+                    case 'Solar':
+                        solarOutput = parseFloat((Math.random() * 5).toFixed(1));
+                        break;
+                    case 'Wind':
+                        windOutput = parseFloat((Math.random() * 5).toFixed(1));
+                        break;
+                    case 'Hybrid':
+                        solarOutput = parseFloat((Math.random() * 3).toFixed(1));
+                        windOutput = parseFloat((Math.random() * 3).toFixed(1));
+                        break;
+                }
+                const totalGeneration = solarOutput + windOutput;
+                
+                const batteryLevelEl = document.getElementById('battery-level-value');
+                const batteryLevel = batteryLevelEl ? Math.max(0, Math.min(100, parseFloat(batteryLevelEl.textContent) + (totalGeneration - currentLoad) * 2)).toFixed(0) : 0;
+                
+                const efficiencyScoreEl = document.getElementById('energy-efficiency-score');
+                const efficiencyScore = efficiencyScoreEl ? Math.max(75, Math.min(98, parseInt(efficiencyScoreEl.textContent) + (Math.random() * 4 - 2))) : 0;
+                
+                const carbonSaved = (totalGeneration * 0.5).toFixed(1);
 
-                // Determine energy source
+                // Determine energy source for display
                 let source = 'Grid';
                 let icon = 'fas fa-warehouse';
                 let mainLabel = 'Powering from Grid';
                 let subLabel = 'Purchasing power from the grid to meet your demand.';
                 let color = 'text-blue-600';
 
-                // Scenario 1: Solar is enough to cover the load
-                if (solarOutput >= currentLoad) {
-                    source = 'Solar';
-                    icon = 'fas fa-solar-panel';
-                    mainLabel = 'Powering from Solar';
-                    subLabel = 'Your home is using clean, free energy from the sun.';
-                    color = 'text-yellow-600';
-                    
-                    // Scenario 2: Solar is producing a surplus and battery is full
+                // Scenario 1: Generation is enough to cover the load
+                if (totalGeneration >= currentLoad) {
+                    source = currentPlantType;
+                    switch(currentPlantType) {
+                        case 'Solar':
+                            icon = 'fas fa-solar-panel';
+                            mainLabel = 'Powering from Solar';
+                            subLabel = 'Your home is using clean, free energy from the sun.';
+                            color = 'text-yellow-600';
+                            break;
+                        case 'Wind':
+                            icon = 'fas fa-wind';
+                            mainLabel = 'Powering from Wind';
+                            subLabel = 'Your home is using energy generated by wind.';
+                            color = 'text-blue-600';
+                            break;
+                        case 'Hybrid':
+                            icon = 'fas fa-cloud-sun-wind';
+                            mainLabel = 'Powering from Solar & Wind';
+                            subLabel = 'Your home is using a combination of solar and wind energy.';
+                            color = 'text-green-600';
+                            break;
+                    }
+
+                    // Scenario 2: Generation is producing a surplus and battery is full
                     if (batteryLevel >= 95) {
                         source = 'Selling';
                         icon = 'fas fa-exchange-alt';
@@ -1002,8 +1238,8 @@
                         color = 'text-purple-600';
                     }
                 } 
-                // Scenario 3: Solar is not enough, but battery can provide power
-                else if (currentLoad > solarOutput && batteryLevel > 20) {
+                // Scenario 3: Generation is not enough, but battery can provide power
+                else if (currentLoad > totalGeneration && batteryLevel > 20) {
                     source = 'Battery';
                     icon = 'fas fa-car-battery';
                     mainLabel = 'Powering from Battery';
@@ -1012,62 +1248,140 @@
                 }
 
                 // Update UI
-                document.getElementById('current-load').textContent = currentLoad;
-                document.getElementById('consumption-progress').style.width = `${(currentLoad / 5) * 100}%`;
-                document.getElementById('solar-current-output').textContent = solarOutput;
-                document.getElementById('solar-progress').style.width = `${(solarOutput / 5) * 100}%`;
-                document.getElementById('battery-level-value').textContent = batteryLevel;
-                document.getElementById('battery-progress').style.width = `${batteryLevel}%`;
-                document.getElementById('energy-efficiency-score').textContent = efficiencyScore;
-                document.getElementById('carbon-saved').textContent = carbonSaved;
-                document.getElementById('trees-planted').textContent = Math.round(carbonSaved / 1.8);
+                const currentLoadEl = document.getElementById('current-load');
+                if (currentLoadEl) currentLoadEl.textContent = currentLoad;
+                
+                const consumptionProgressEl = document.getElementById('consumption-progress');
+                if (consumptionProgressEl) consumptionProgressEl.style.width = `${(currentLoad / 5) * 100}%`;
+                
+                // Update generation card based on plant type
+                if (currentPlantType === 'Solar' || currentPlantType === 'Hybrid') {
+                    const solarOutputEl = document.getElementById('solar-current-output');
+                    if (solarOutputEl) solarOutputEl.textContent = solarOutput;
+                    
+                    const solarProgressEl = document.getElementById('solar-progress');
+                    if (solarProgressEl) solarProgressEl.style.width = `${(solarOutput / 5) * 100}%`;
+                    
+                    const solarTodayGenEl = document.getElementById('solar-today-gen');
+                    if (solarTodayGenEl) solarTodayGenEl.textContent = `${(parseFloat(solarTodayGenEl.textContent) + solarOutput).toFixed(1)} kWh Today`;
+                }
+                if (currentPlantType === 'Wind' || currentPlantType === 'Hybrid') {
+                    const windOutputEl = document.getElementById('wind-current-output');
+                    if (windOutputEl) windOutputEl.textContent = windOutput;
+                    
+                    const windProgressEl = document.getElementById('wind-progress');
+                    if (windProgressEl) windProgressEl.style.width = `${(windOutput / 5) * 100}%`;
+                    
+                    const windTodayGenEl = document.getElementById('wind-today-gen');
+                    if (windTodayGenEl) windTodayGenEl.textContent = `${(parseFloat(windTodayGenEl.textContent) + windOutput).toFixed(1)} kWh Today`;
+                }
+                
+                if (batteryLevelEl) batteryLevelEl.textContent = batteryLevel;
+                const batteryProgressEl = document.getElementById('battery-progress');
+                if (batteryProgressEl) batteryProgressEl.style.width = `${batteryLevel}%`;
+                
+                if (efficiencyScoreEl) efficiencyScoreEl.textContent = efficiencyScore.toFixed(1);
+                
+                const carbonSavedEl = document.getElementById('carbon-saved');
+                if (carbonSavedEl) carbonSavedEl.textContent = carbonSaved;
+                
+                const treesPlantedEl = document.getElementById('trees-planted');
+                if (treesPlantedEl) treesPlantedEl.textContent = Math.round(carbonSaved / 1.8);
                 
                 // Update Energy Source Card
-                document.getElementById('source-icon').innerHTML = `<i class="${icon}"></i>`;
-                document.getElementById('source-icon').className = `text-4xl ${color}`;
-                document.getElementById('source-main-label').textContent = mainLabel;
-                document.getElementById('source-main-label').className = `text-xl md:text-2xl font-bold ${color}`;
-                document.getElementById('source-sub-label').textContent = subLabel;
+                const sourceIconEl = document.getElementById('source-icon');
+                if (sourceIconEl) sourceIconEl.innerHTML = `<i class="${icon}"></i>`;
+                if (sourceIconEl) sourceIconEl.className = `text-4xl ${color}`;
+                
+                const sourceMainLabelEl = document.getElementById('source-main-label');
+                if (sourceMainLabelEl) sourceMainLabelEl.textContent = mainLabel;
+                if (sourceMainLabelEl) sourceMainLabelEl.className = `text-xl md:text-2xl font-bold ${color}`;
+                
+                const sourceSubLabelEl = document.getElementById('source-sub-label');
+                if (sourceSubLabelEl) sourceSubLabelEl.textContent = subLabel;
 
                 // Update Energy Flow Diagram (on Energy Flow panel)
-                document.getElementById('flow-solar-output').textContent = `${solarOutput} kW`;
-                document.getElementById('flow-battery-status').textContent = `${batteryLevel}%`;
-                document.getElementById('flow-home-load').textContent = `${currentLoad} kW`;
-                document.getElementById('flow-load-source').textContent = `Sourced from: ${source}`;
+                const flowSolarOutputEl = document.getElementById('flow-solar-output');
+                if (flowSolarOutputEl) flowSolarOutputEl.textContent = `${solarOutput} kW`;
                 
-                document.getElementById('solar-to-home-path').classList.toggle('hidden', source !== 'Solar' && source !== 'Selling');
-                document.getElementById('grid-to-home-path').classList.toggle('hidden', source !== 'Grid');
-                document.getElementById('battery-to-home-path').classList.toggle('hidden', source !== 'Battery');
-                document.getElementById('solar-to-grid-path').classList.toggle('hidden', source !== 'Selling');
+                const flowWindOutputEl = document.getElementById('flow-wind-output');
+                if (flowWindOutputEl) flowWindOutputEl.textContent = `${windOutput} kW`;
+                
+                const flowBatteryStatusEl = document.getElementById('flow-battery-status');
+                if (flowBatteryStatusEl) flowBatteryStatusEl.textContent = `${batteryLevel}%`;
+                
+                const flowHomeLoadEl = document.getElementById('flow-home-load');
+                if (flowHomeLoadEl) flowHomeLoadEl.textContent = `${currentLoad} kW`;
+                
+                const flowLoadSourceEl = document.getElementById('flow-load-source');
+                if (flowLoadSourceEl) flowLoadSourceEl.textContent = `Sourced from: ${source}`;
+                
+                const flowSource1El = document.getElementById('flow-source-1');
+                if (flowSource1El) flowSource1El.classList.toggle('hidden', currentPlantType !== 'Solar' && currentPlantType !== 'Hybrid');
+                
+                const flowSource2El = document.getElementById('flow-source-2');
+                if (flowSource2El) flowSource2El.classList.toggle('hidden', currentPlantType !== 'Wind' && currentPlantType !== 'Hybrid');
 
+                const solarToHomePathEl = document.getElementById('solar-to-home-path');
+                if (solarToHomePathEl) solarToHomePathEl.classList.toggle('hidden', source !== 'Solar' && source !== 'Hybrid' && source !== 'Selling');
+                
+                const windToHomePathEl = document.getElementById('wind-to-home-path');
+                if (windToHomePathEl) windToHomePathEl.classList.toggle('hidden', source !== 'Wind' && source !== 'Hybrid' && source !== 'Selling');
+                
+                const gridToHomePathEl = document.getElementById('grid-to-home-path');
+                if (gridToHomePathEl) gridToHomePathEl.classList.toggle('hidden', source !== 'Grid');
+                
+                const batteryToHomePathEl = document.getElementById('battery-to-home-path');
+                if (batteryToHomePathEl) batteryToHomePathEl.classList.toggle('hidden', source !== 'Battery');
+                
+                const solarToGridPathEl = document.getElementById('solar-to-grid-path');
+                if (solarToGridPathEl) solarToGridPathEl.classList.toggle('hidden', source !== 'Selling');
+                
                 // Simulate alerts
                 const anomalyAlert = document.getElementById('anomaly-alert');
-                if (Math.random() < 0.1) {
-                    anomalyAlert.classList.remove('hidden');
-                } else {
-                    anomalyAlert.classList.add('hidden');
+                if (anomalyAlert) {
+                    if (Math.random() < 0.1) {
+                        anomalyAlert.classList.remove('hidden');
+                    } else {
+                        anomalyAlert.classList.add('hidden');
+                    }
                 }
 
                 const batteryAlert = document.getElementById('battery-health-alert');
-                if (parseInt(batteryLevel) < 20 || parseInt(batteryLevel) > 95) {
-                    batteryAlert.classList.remove('hidden');
-                } else {
-                    batteryAlert.classList.add('hidden');
+                if (batteryAlert) {
+                    if (parseInt(batteryLevel) < 20 || parseInt(batteryLevel) > 95) {
+                        batteryAlert.classList.remove('hidden');
+                    } else {
+                        batteryAlert.classList.add('hidden');
+                    }
                 }
 
                 // AI recommendation logic
+                const netSurplus = (totalGeneration - currentLoad).toFixed(1);
                 const recommendations = [
-                    `Current solar surplus of ${ (solarOutput - currentLoad).toFixed(1) } kW. Consider charging your EV or running heavy appliances.`,
+                    `Current generation surplus of ${netSurplus} kW. Consider charging your EV or running heavy appliances.`,
                     `Your battery level is at ${batteryLevel}%. We recommend charging fully before nightfall.`,
                     `Predicted cloud cover tomorrow. Adjust your energy usage plan to minimize grid dependency.`,
                     `Excellent efficiency! You've offset ${carbonSaved} kg of CO₂ today.`
                 ];
-                document.getElementById('ai-recommendation').textContent = recommendations[Math.floor(Math.random() * recommendations.length)];
-            };
+                const aiRecommendationEl = document.getElementById('ai-recommendation');
+                if (aiRecommendationEl) {
+                    aiRecommendationEl.textContent = recommendations[Math.floor(Math.random() * recommendations.length)];
+                }
 
-            // Initial and periodic updates
-            updateLiveMetrics();
-            setInterval(updateLiveMetrics, 5000);
+                const analyticsGenEl = document.getElementById('analytics-gen');
+                if (analyticsGenEl) {
+                    analyticsGenEl.textContent = `${totalGeneration.toFixed(1)} kWh`;
+                }
+                const analyticsConEl = document.getElementById('analytics-con');
+                if (analyticsConEl) {
+                    analyticsConEl.textContent = `${currentLoad.toFixed(1)} kWh`;
+                }
+                const analyticsSurplusEl = document.getElementById('analytics-surplus');
+                if (analyticsSurplusEl) {
+                    analyticsSurplusEl.textContent = `${(totalGeneration - currentLoad).toFixed(1)} kWh`;
+                }
+            };
 
             // Weather Data (Simulated for this example)
             const updateWeather = () => {
@@ -1076,56 +1390,74 @@
                     condition: 'Clear Sky',
                     icon: 'fas fa-sun'
                 };
-                document.getElementById('weather-temp').textContent = mockWeather.temp;
-                document.getElementById('weather-condition').textContent = mockWeather.condition;
-                document.getElementById('weather-icon').className = `text-5xl md:text-6xl text-yellow-500 ${mockWeather.icon}`;
+                const weatherTempEl = document.getElementById('weather-temp');
+                if (weatherTempEl) weatherTempEl.textContent = mockWeather.temp;
+                
+                const weatherConditionEl = document.getElementById('weather-condition');
+                if (weatherConditionEl) weatherConditionEl.textContent = mockWeather.condition;
+                
+                const weatherIconEl = document.getElementById('weather-icon');
+                if (weatherIconEl) weatherIconEl.className = `text-5xl md:text-6xl text-yellow-500 ${mockWeather.icon}`;
             };
             updateWeather();
             setInterval(updateWeather, 300000);
 
             // Voice Command Simulation
-            document.querySelector('.voice-command-btn').addEventListener('click', function() {
-                this.innerHTML = '<i class="fas fa-circle-notch fa-spin text-xl"></i>';
-                this.style.background = 'linear-gradient(45deg, var(--danger), var(--warning))';
-                setTimeout(() => {
-                    this.innerHTML = '<i class="fas fa-microphone text-xl"></i>';
-                    this.style.background = 'linear-gradient(45deg, var(--secondary), var(--accent))';
-                    const response = document.createElement('div');
-                    response.className = 'fixed bottom-28 right-8 bg-green-700 text-white text-sm px-4 py-2 rounded-xl shadow-lg animate-fadeIn';
-                    response.textContent = "Voice command recognized. Fetching data.";
-                    document.body.appendChild(response);
-                    setTimeout(() => response.remove(), 3000);
-                }, 2000);
-            });
+            const voiceCommandBtn = document.querySelector('.voice-command-btn');
+            if (voiceCommandBtn) {
+                voiceCommandBtn.addEventListener('click', function() {
+                    this.innerHTML = '<i class="fas fa-circle-notch fa-spin text-xl"></i>';
+                    this.style.background = 'linear-gradient(45deg, var(--danger), var(--warning))';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-microphone text-xl"></i>';
+                        this.style.background = 'linear-gradient(45deg, var(--secondary), var(--accent))';
+                        const response = document.createElement('div');
+                        response.className = 'fixed bottom-28 right-8 bg-green-700 text-white text-sm px-4 py-2 rounded-xl shadow-lg animate-fadeIn';
+                        response.textContent = "Voice command recognized. Fetching data.";
+                        document.body.appendChild(response);
+                        setTimeout(() => response.remove(), 3000);
+                    }, 2000);
+                });
+            }
 
 
             // Manual Sell Form Submission
-            document.getElementById('sell-form').addEventListener('submit', (event) => {
-                event.preventDefault();
-                const quantityInput = document.getElementById('sell-quantity');
-                const quantity = parseFloat(quantityInput.value);
-                
-                if (quantity > 0) {
-                    const amountEarned = quantity * tradeState.sellPrice;
-                    updateBalance(amountEarned);
-                    addTransaction('sold', quantity, 'Grid');
-                    quantityInput.value = '';
-                }
-            });
+            const sellForm = document.getElementById('sell-form');
+            if (sellForm) {
+                sellForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const quantityInput = document.getElementById('sell-quantity');
+                    const quantity = parseFloat(quantityInput.value);
+                    
+                    if (quantity > 0) {
+                        const amountEarned = quantity * tradeState.sellPrice;
+                        updateBalance(amountEarned);
+                        addTransaction('sold', quantity, 'Grid');
+                        quantityInput.value = '';
+                    }
+                });
+            }
 
             // Automated Trade Alert
             function showTradeAlert(quantity, client) {
-                document.getElementById('trade-alert-message').textContent = `Client ${client} needs ${quantity.toFixed(1)} kWh. Sell for ₹${(quantity * tradeState.sellPrice).toFixed(2)}?`;
-                tradeAlertContainer.classList.remove('hidden');
+                const tradeAlertMessageEl = document.getElementById('trade-alert-message');
+                if (tradeAlertMessageEl) {
+                    tradeAlertMessageEl.textContent = `Client ${client} needs ${quantity.toFixed(1)} kWh. Sell for ₹${(quantity * tradeState.sellPrice).toFixed(2)}?`;
+                }
+                if (tradeAlertContainer) {
+                    tradeAlertContainer.classList.remove('hidden');
+                }
 
                 const handleTrade = (action) => {
                     if (action === 'accept') {
                         updateBalance(quantity * tradeState.sellPrice);
                         addTransaction('sold', quantity, `Client ${client}`);
                     }
-                    tradeAlertContainer.classList.add('hidden');
-                    acceptTradeBtn.removeEventListener('click', acceptHandler);
-                    declineTradeBtn.removeEventListener('click', declineHandler);
+                    if (tradeAlertContainer) {
+                        tradeAlertContainer.classList.add('hidden');
+                    }
+                    if (acceptTradeBtn) acceptTradeBtn.removeEventListener('click', acceptHandler);
+                    if (declineTradeBtn) declineTradeBtn.removeEventListener('click', declineHandler);
                     clearTimeout(tradeAlertTimeout);
                     startTradeAlerts();
                 };
@@ -1133,11 +1465,13 @@
                 const acceptHandler = () => handleTrade('accept');
                 const declineHandler = () => handleTrade('decline');
 
-                acceptTradeBtn.addEventListener('click', acceptHandler);
-                declineTradeBtn.addEventListener('click', declineHandler);
+                if (acceptTradeBtn) acceptTradeBtn.addEventListener('click', acceptHandler);
+                if (declineTradeBtn) declineTradeBtn.addEventListener('click', declineHandler);
                 
                 tradeAlertTimeout = setTimeout(() => {
-                    tradeAlertContainer.classList.add('hidden');
+                    if (tradeAlertContainer) {
+                        tradeAlertContainer.classList.add('hidden');
+                    }
                     startTradeAlerts();
                 }, 20000); // Alert disappears after 20 seconds
             }
@@ -1145,7 +1479,7 @@
             // Start a recurring timer for trade alerts
             function startTradeAlerts() {
                 const tradingPanel = document.getElementById('trading-panel');
-                if (tradingPanel.classList.contains('active')) {
+                if (tradingPanel && tradingPanel.classList.contains('active')) {
                     const nextAlert = Math.random() * 20000 + 10000; // 10-30 seconds
                     setTimeout(() => {
                         const randomQuantity = Math.random() * 3 + 0.5;
