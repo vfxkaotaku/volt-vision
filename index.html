@@ -671,6 +671,31 @@
                         <p class="text-xs text-red-700 font-medium">Unusual energy spike detected.</p>
                     </div>
                 </div>
+
+                <!-- Environmental Impact Card -->
+                <div class="glass-card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-green-800 flex items-center gap-2">
+                            <i class="fas fa-leaf text-green-600"></i> Impact
+                        </h2>
+                        <div class="text-sm text-gray-600 flex items-center gap-1">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="font-medium" id="eco-score">Eco-Friendly</span>
+                        </div>
+                    </div>
+                    <div class="text-center mb-4">
+                        <div class="data-value text-green-700">
+                            <span id="carbon-saved">9.3</span> <span class="text-xl">kg</span>
+                        </div>
+                        <div class="data-label">CO₂ Saved Today</div>
+                    </div>
+                    <div class="flex items-center justify-center gap-4">
+                        <i class="fas fa-tree text-3xl text-green-700"></i>
+                        <div class="text-sm text-gray-700">
+                            Equivalent to planting <span class="font-bold text-green-800" id="trees-planted">5</span> trees.
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -867,7 +892,7 @@
                             </div>
                              <div>
                                 <div class="text-gray-500 text-sm">Net Balance</div>
-                                <div class="text-xl font-bold text-green-800" id="market-net-balance">₹ 0.00</div>
+                                <div class="text-xl font-bold text-green-800">₹5,400</div>
                             </div>
                         </div>
                         <h4 class="font-medium text-lg mt-6 mb-2">Recent Trades</h4>
@@ -986,464 +1011,162 @@
     
     <!-- Audio for alert sound -->
     <audio id="alert-sound" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3/buzzer.wav" preload="auto"></audio>
-    
-    <!-- Firebase SDK Scripts -->
-    <script type="module">
-        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firestore configuration variables
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db;
-        let auth;
-        let userDocRef;
-        let userId;
-
-        // Global state for a single source of truth
-        let appState = {
-            currentPlantType: '',
-            isEmergencyMode: false,
-            mockWeatherCondition: 'Clear Sky',
-            mockBatteryLevel: 72,
-            currentLoad: 2.8,
-            totalGeneration: 3.2,
-            tradeState: {
-                balance: 5400,
-                clientId: '0x' + Math.random().toString(16).slice(2, 8),
-                sellPrice: 6.20,
-                history: [
-                    { type: 'sold', quantity: 2.5, to: 'User 5c1d', time: '3:15 PM' },
-                    { type: 'bought', quantity: 1.1, from: 'Grid', time: '2:40 PM' }
-                ]
-            }
+    <script>
+        // Global state for trading
+        const tradeState = {
+            balance: 5400,
+            clientId: '0x' + Math.random().toString(16).slice(2, 8),
+            sellPrice: 6.20,
+            history: [
+                { type: 'sold', quantity: 2.5, to: 'User 5c1d', time: '3:15 PM' },
+                { type: 'bought', quantity: 1.1, from: 'Grid', time: '2:40 PM' }
+            ]
         };
 
+        // Global state for emergency mode
+        let isEmergencyMode = false;
+
+        // Data and UI management script
+        let mockWeatherCondition = 'Clear Sky';
+        let mockBatteryLevel = 72;
+        let currentLoad = 2.8;
         let predictionChart, weeklyConsumptionChart, usageBreakdownChart, solarForecastChart;
 
-        // UI update functions
-        const updatePlantUI = () => {
-            const sourceIconEl = document.getElementById('source-icon');
-            const sourceMainLabelEl = document.getElementById('source-main-label');
-            const sourceSubLabelEl = document.getElementById('source-sub-label');
-            const solarCard = document.getElementById('solar-card');
-            const windCard = document.getElementById('wind-card');
-            
-            if (solarCard) solarCard.classList.add('hidden');
-            if (windCard) windCard.classList.add('hidden');
-            
-            let icon, mainLabel, subLabel;
-
-            switch (appState.currentPlantType) {
-                case 'Solar':
-                    icon = 'fas fa-solar-panel';
-                    mainLabel = 'Powering from Solar';
-                    subLabel = 'Your home is using clean energy from the sun.';
-                    if (solarCard) solarCard.classList.remove('hidden');
-                    break;
-                case 'Wind':
-                    icon = 'fas fa-wind';
-                    mainLabel = 'Powering from Wind';
-                    subLabel = 'Your home is using energy generated by wind.';
-                    if (windCard) windCard.classList.remove('hidden');
-                    break;
-                case 'Hybrid':
-                    icon = 'fas fa-cloud-sun-wind';
-                    mainLabel = 'Powering from Solar & Wind';
-                    subLabel = 'Your home is using a combination of solar and wind energy.';
-                    if (solarCard) solarCard.classList.remove('hidden');
-                    if (windCard) windCard.classList.remove('hidden');
-                    break;
-                default:
-                    icon = 'fas fa-question-circle';
-                    mainLabel = 'Unknown Source';
-                    subLabel = 'Please select your plant type.';
-                    break;
-            }
-
-            if (sourceIconEl) {
-                sourceIconEl.innerHTML = `<i class="${icon}"></i>`;
-            }
-            if (sourceMainLabelEl) {
-                sourceMainLabelEl.textContent = mainLabel;
-            }
-            if (sourceSubLabelEl) {
-                sourceSubLabelEl.textContent = subLabel;
-            }
-        };
-        
-        const updateEnergyFlowUI = () => {
-            const flowSolarOutputEl = document.getElementById('flow-solar-output');
-            if (flowSolarOutputEl) flowSolarOutputEl.textContent = `${appState.totalGeneration.toFixed(1)} kW`;
-            
-            const flowBatteryStatusEl = document.getElementById('flow-battery-status');
-            if (flowBatteryStatusEl) flowBatteryStatusEl.textContent = `${Math.round(appState.mockBatteryLevel)}%`;
-            
-            const flowHomeLoadEl = document.getElementById('flow-home-load');
-            if (flowHomeLoadEl) flowHomeLoadEl.textContent = `${appState.currentLoad.toFixed(1)} kW`;
-            
-            const flowLoadSourceEl = document.getElementById('flow-load-source');
-            if (flowLoadSourceEl) flowLoadSourceEl.textContent = `Sourced from: ${appState.isEmergencyMode ? 'Grid' : appState.currentPlantType}`;
-            
-            document.querySelectorAll('.energy-flow-path').forEach(el => {
-                el.classList.add('hidden');
-                el.classList.remove('flow-line-green', 'flow-line-yellow', 'flow-line-blue', 'flow-line-red');
-            });
-            
-            const getPathElement = (pathId) => document.getElementById(pathId);
-            let source = appState.isEmergencyMode ? 'Grid' : appState.currentPlantType;
-            let path;
-
-            switch (source) {
-                case 'Solar':
-                case 'Hybrid':
-                    path = getPathElement('solar-to-home-path');
-                    if(path) path.classList.remove('hidden');
-                    if(appState.isEmergencyMode) { 
-                        path.classList.add('flow-line-blue');
-                    } else {
-                        path.classList.add('flow-line-yellow');
-                    }
-                    break;
-                case 'Wind':
-                    path = getPathElement('wind-to-home-path');
-                    if(path) {
-                        path.classList.remove('hidden');
-                        path.classList.add('flow-line-blue');
-                    }
-                    break;
-                case 'Battery':
-                    path = getPathElement('battery-to-home-path');
-                    if(path) {
-                        path.classList.remove('hidden');
-                        path.classList.add('flow-line-green');
-                    }
-                    break;
-                case 'Grid':
-                    path = getPathElement('grid-to-home-path');
-                    if(path) {
-                        path.classList.remove('hidden');
-                        path.classList.add('flow-line-blue');
-                    }
-                    break;
-                case 'Selling':
-                    path = getPathElement('solar-to-grid-path');
-                    if (path) {
-                        path.classList.remove('hidden');
-                        path.classList.add('flow-line-red');
-                    }
-                    break;
-            }
-        };
-
-        const updateWeatherUI = () => {
-            const weatherTempEl = document.getElementById('weather-temp');
-            const weatherConditionEl = document.getElementById('weather-condition');
-            const weatherIconEl = document.getElementById('weather-icon');
-            
-            if (weatherTempEl) weatherTempEl.textContent = (Math.random() * 4 + 27).toFixed(1);
-            if (weatherConditionEl) weatherConditionEl.textContent = appState.mockWeatherCondition;
-            
-            let icon;
-            switch(appState.mockWeatherCondition) {
-                case 'Cloudy': icon = 'fas fa-cloud'; break;
-                case 'Rain': icon = 'fas fa-cloud-rain'; break;
-                case 'Partly Cloudy': icon = 'fas fa-cloud-sun'; break;
-                default: icon = 'fas fa-sun'; break;
-            }
-            if (weatherIconEl) weatherIconEl.className = `text-5xl md:text-6xl text-yellow-500 ${icon}`;
-        };
-
-        const updateDashboardUIFromData = (data) => {
-             // Update appState from the data
-            Object.assign(appState, data);
-
-            const lastUpdatedEl = document.getElementById('last-updated');
-            if (lastUpdatedEl) {
-                lastUpdatedEl.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            }
-            
-            const batteryLevelEl = document.getElementById('battery-level-value');
-            if (batteryLevelEl) batteryLevelEl.textContent = Math.round(appState.mockBatteryLevel);
-            
-            const batteryProgressEl = document.getElementById('battery-progress');
-            if (batteryProgressEl) batteryProgressEl.style.width = `${appState.mockBatteryLevel}%`;
-            
-            const currentLoadEl = document.getElementById('current-load');
-            if (currentLoadEl) currentLoadEl.textContent = appState.currentLoad.toFixed(1);
-            
-            const consumptionProgressEl = document.getElementById('consumption-progress');
-            if (consumptionProgressEl) consumptionProgressEl.style.width = `${(appState.currentLoad / 5) * 100}%`;
-            
-            const aiRecommendationEl = document.getElementById('ai-recommendation');
-            const purchaseEnergyBtn = document.getElementById('purchase-energy-btn');
-            if (appState.isEmergencyMode) {
-                aiRecommendationEl.textContent = 'You have to purchase energy from the grid. Turn on lights, but do not use heavy appliances.';
-                aiRecommendationEl.parentElement.classList.remove('bg-blue-50', 'border-blue-500');
-                aiRecommendationEl.parentElement.classList.add('bg-red-50', 'border-red-500');
-                aiRecommendationEl.previousElementSibling.firstElementChild.className = 'fas fa-exclamation-triangle';
-                aiRecommendationEl.previousElementSibling.classList.remove('text-blue-800');
-                aiRecommendationEl.previousElementSibling.classList.add('text-red-800');
-                aiRecommendationEl.classList.remove('text-blue-700');
-                aiRecommendationEl.classList.add('text-red-700');
-                purchaseEnergyBtn.classList.remove('hidden');
-            } else {
-                const netSurplus = (appState.totalGeneration - appState.currentLoad).toFixed(1);
-                const recommendations = [
-                    `Current generation surplus of ${netSurplus} kW. Consider charging your EV or running heavy appliances.`,
-                    `Your battery level is at ${appState.mockBatteryLevel}%. We recommend charging fully before nightfall.`,
-                    `Predicted cloud cover tomorrow. Adjust your energy usage plan to minimize grid dependency.`,
-                    `Excellent efficiency! You've offset ${appState.totalGeneration * 0.5} kg of CO₂ today.`
-                ];
-                if (aiRecommendationEl) {
-                    aiRecommendationEl.textContent = recommendations[Math.floor(Math.random() * recommendations.length)];
-                    aiRecommendationEl.parentElement.classList.add('bg-blue-50', 'border-blue-500');
-                    aiRecommendationEl.parentElement.classList.remove('bg-red-50', 'border-red-500');
-                    aiRecommendationEl.previousElementSibling.firstElementChild.className = 'fas fa-robot';
-                    aiRecommendationEl.previousElementSibling.classList.add('text-blue-800');
-                    aiRecommendationEl.previousElementSibling.classList.remove('text-red-800');
-                    aiRecommendationEl.classList.add('text-blue-700');
-                    aiRecommendationEl.classList.remove('text-red-700');
-                    purchaseEnergyBtn.classList.add('hidden');
-                }
-            }
-            updatePlantUI();
-            updateWeatherUI();
-            updateEnergyFlowUI();
-            renderTransactionHistory();
-        };
-
-        const updateLiveMetrics = () => {
-            if (!appState.isEmergencyMode) {
-                appState.currentLoad = parseFloat((Math.random() * 4 + 1).toFixed(1));
-            } else {
-                appState.currentLoad = parseFloat((Math.random() * 2 + 0.5).toFixed(1));
-            }
-
-            let solarOutput = 0, windOutput = 0;
-
-            if (appState.isEmergencyMode) {
-                solarOutput = 0.1;
-                windOutput = 0.1;
-                appState.mockBatteryLevel = Math.max(10, appState.mockBatteryLevel - 5);
-                appState.mockWeatherCondition = 'Cloudy';
-            } else {
-                switch(appState.currentPlantType) {
-                    case 'Solar':
-                        solarOutput = parseFloat((Math.random() * 5).toFixed(1));
-                        break;
-                    case 'Wind':
-                        windOutput = parseFloat((Math.random() * 5).toFixed(1));
-                        break;
-                    case 'Hybrid':
-                        solarOutput = parseFloat((Math.random() * 3).toFixed(1));
-                        windOutput = parseFloat((Math.random() * 3).toFixed(1));
-                        break;
-                }
-                appState.mockBatteryLevel = Math.max(0, Math.min(100, appState.mockBatteryLevel + (solarOutput + windOutput - appState.currentLoad) * 2));
-                const weatherConditions = ['Clear Sky', 'Partly Cloudy', 'Cloudy', 'Rain'];
-                appState.mockWeatherCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-            }
-            appState.totalGeneration = solarOutput + windOutput;
-            
-            const lastUpdatedEl = document.getElementById('last-updated');
-            if (lastUpdatedEl) {
-                lastUpdatedEl.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            }
-
-            // Update Firestore with the new state
-            if (userDocRef) {
-                setDoc(userDocRef, appState, { merge: true }).catch(console.error);
-            }
-        };
-        
-        const renderTransactionHistory = () => {
-            const transactionHistoryEl = document.getElementById('transaction-history');
-            if (!transactionHistoryEl) return;
-
-            transactionHistoryEl.innerHTML = '';
-            appState.tradeState.history.forEach(trade => {
-                const iconClass = trade.type === 'sold' ? 'fa-arrow-down text-red-500' : 'fa-arrow-up text-green-500';
-                const message = trade.type === 'sold' ?
-                    `Sold ${trade.quantity.toFixed(1)} kWh to ${trade.to}` :
-                    `Bought ${trade.quantity.toFixed(1)} kWh from ${trade.from}`;
-
-                const transactionEl = document.createElement('div');
-                transactionEl.className = 'flex justify-between items-center p-2 rounded-lg bg-gray-100 text-sm';
-                transactionEl.innerHTML = `
-                    <span><i class="fas ${iconClass} mr-2"></i>${message}</span>
-                    <span class="font-mono text-xs text-gray-600">${trade.time}</span>
-                `;
-                transactionHistoryEl.appendChild(transactionEl);
-            });
-        };
-
-        const addTransaction = (type, quantity, toFrom) => {
-            appState.tradeState.history.unshift({
-                type: type,
-                quantity: quantity,
-                [type === 'sold' ? 'to' : 'from']: toFrom,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
-            if (appState.tradeState.history.length > 5) {
-                appState.tradeState.history.pop();
-            }
-        };
-
-        const initCharts = () => {
-            const predictionCtx = document.getElementById('generation-prediction-chart');
-            if (predictionCtx) {
-                predictionChart = new Chart(predictionCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: ['1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
-                        datasets: [{
-                            label: 'Predicted Generation (kW)',
-                            data: [4.1, 4.5, 4.2, 3.1, 1.8, 0.5],
-                            borderColor: '#4caf50',
-                            backgroundColor: (context) => {
-                                const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 120);
-                                gradient.addColorStop(0, 'rgba(76, 175, 80, 0.4)');
-                                gradient.addColorStop(1, 'rgba(76, 175, 80, 0)');
-                                return gradient;
-                            },
-                            fill: true,
-                            tension: 0.4,
-                            borderWidth: 3,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#4caf50'
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Generation: ${context.raw.toFixed(1)} kW` } } }, scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
-                });
-            }
-            
-            const weeklyConsumptionCtx = document.getElementById('weekly-consumption-chart');
-            if (weeklyConsumptionCtx) {
-                weeklyConsumptionChart = new Chart(weeklyConsumptionCtx.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                        datasets: [{
-                            label: 'Consumption (kWh)',
-                            data: [12, 15, 14, 18, 16, 20, 19],
-                            backgroundColor: '#3b82f6',
-                            borderRadius: 5
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
-                });
-            }
-
-            const usageBreakdownCtx = document.getElementById('usage-breakdown-chart');
-            if (usageBreakdownCtx) {
-                usageBreakdownChart = new Chart(usageBreakdownCtx.getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['HVAC', 'Appliances', 'Lighting', 'Electronics'],
-                        datasets: [{
-                            data: [45, 30, 15, 10],
-                            backgroundColor: ['#d32f2f', '#f57c00', '#4caf50', '#10b981'],
-                            hoverOffset: 4
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-                });
-            }
-            const solarForecastCtx = document.getElementById('solar-forecast-chart');
-            if (solarForecastCtx) {
-                solarForecastChart = new Chart(solarForecastCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
-                        datasets: [{
-                            label: 'Solar Generation Forecast (kWh)',
-                            data: [18.6, 15, 12, 16, 22, 10, 21],
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
-                });
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            setLogLevel('debug');
-            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing. App cannot run without it.");
-                return;
-            }
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            
-            await new Promise((resolve) => {
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                    } else {
-                        try {
-                            if (initialAuthToken) {
-                                const userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                                userId = userCredential.user.uid;
-                            } else {
-                                const userCredential = await signInAnonymously(auth);
-                                userId = userCredential.user.uid;
-                            }
-                        } catch (error) {
-                            console.error("Firebase auth failed:", error);
-                        }
-                    }
-                    resolve();
-                });
-            });
-
-            if (!userId) {
-                console.error("User ID is not defined. Login process may have failed.");
-                return;
-            }
-
-            userDocRef = doc(db, `artifacts/${appId}/users/${userId}/data/microgrid`);
-
+        document.addEventListener('DOMContentLoaded', () => {
             const loginPage = document.getElementById('login-page');
             const mainDashboard = document.getElementById('main-dashboard');
             const loginForm = document.getElementById('login-form');
             
+            // New Trading Panel Functionality
+            const transactionHistoryEl = document.getElementById('transaction-history');
+            const tradeAlertContainer = document.getElementById('trade-alert-container');
+            const acceptTradeBtn = document.getElementById('accept-trade-btn');
+            const declineTradeBtn = document.getElementById('decline-trade-btn');
+            const messageModalContainer = document.getElementById('message-modal-container');
+            const messageModalText = document.getElementById('message-modal-text');
+            const messageModalCloseBtn = document.getElementById('message-modal-close');
+            let tradeAlertTimeout;
+            let currentPlantType = ''; // To store the selected plant type
+            
+            // Emergency alert elements
             const emergencyAlertContainer = document.getElementById('emergency-alert-container');
             const emergencyAlertCloseBtn = document.getElementById('emergency-alert-close-btn');
             const alertSound = document.getElementById('alert-sound');
 
+            // Chat bot elements
             const chatBotIcon = document.getElementById('chat-bot-icon');
             const chatContainer = document.getElementById('chat-container');
             const closeChatBtn = document.getElementById('close-chat');
             const chatMessages = document.getElementById('chat-messages');
             const chatInput = document.getElementById('chat-input');
+
+            // Purchase button elements
             const purchaseEnergyBtn = document.getElementById('purchase-energy-btn');
-            const sellForm = document.getElementById('sell-form');
 
-            const addMessage = (message, isUser) => {
-                const messageElement = document.createElement('div');
-                messageElement.className = `chat-message-text ${isUser ? 'user-message' : 'bot-message'}`;
-                messageElement.textContent = message;
-                chatMessages.appendChild(messageElement);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            };
+            // Get all the DOM elements once on load to avoid repeated lookups and redeclaration errors
+            const lastUpdatedEl = document.getElementById('last-updated');
+            const efficiencyScoreEl = document.getElementById('energy-efficiency-score');
+            const solarCard = document.getElementById('solar-card');
+            const solarOutputEl = document.getElementById('solar-current-output');
+            const solarProgressEl = document.getElementById('solar-progress');
+            const solarTodayGenEl = document.getElementById('solar-today-gen');
+            const windCard = document.getElementById('wind-card');
+            const windOutputEl = document.getElementById('wind-current-output');
+            const windProgressEl = document.getElementById('wind-progress');
+            const windTodayGenEl = document.getElementById('wind-today-gen');
+            const batteryLevelEl = document.getElementById('battery-level-value');
+            const batteryProgressEl = document.getElementById('battery-progress');
+            const carbonSavedEl = document.getElementById('carbon-saved');
+            const treesPlantedEl = document.getElementById('trees-planted');
+            const sourceIconEl = document.getElementById('source-icon');
+            const sourceMainLabelEl = document.getElementById('source-main-label');
+            const sourceSubLabelEl = document.getElementById('source-sub-label');
+            const flowSolarOutputEl = document.getElementById('flow-solar-output');
+            const flowWindOutputEl = document.getElementById('flow-wind-output');
+            const flowBatteryStatusEl = document.getElementById('flow-battery-status');
+            const flowLoadSourceEl = document.getElementById('flow-load-source');
+            const flowSource1El = document.getElementById('flow-source-1');
+            const flowSource2El = document.getElementById('flow-source-2');
+            const anomalyAlert = document.getElementById('anomaly-alert');
+            const batteryAlert = document.getElementById('battery-health-alert');
+            const aiRecommendationEl = document.getElementById('ai-recommendation');
+            const analyticsGenEl = document.getElementById('analytics-gen');
+            const analyticsConEl = document.getElementById('analytics-con');
+            const analyticsSurplusEl = document.getElementById('analytics-surplus');
+            const gridCurrentEl = document.getElementById('grid-current');
+            const gridVoltageEl = document.getElementById('grid-voltage');
+            const gridBillEl = document.getElementById('grid-bill');
+            const meterCurrentEl = document.getElementById('meter-current');
+            const meterVoltageEl = document.getElementById('meter-voltage');
+            const currentLoadEl = document.getElementById('current-load');
+            const consumptionProgressEl = document.getElementById('consumption-progress');
+            const solarToHomePath = document.getElementById('solar-to-home-path');
+            const windToHomePath = document.getElementById('wind-to-home-path');
+            const gridToHomePath = document.getElementById('grid-to-home-path');
+            const batteryToHomePath = document.getElementById('battery-to-home-path');
+            const solarToGridPath = document.getElementById('solar-to-grid-path');
+            const weatherTempEl = document.getElementById('weather-temp');
+            const weatherConditionEl = document.getElementById('weather-condition');
+            const weatherIconEl = document.getElementById('weather-icon');
+            const weatherWindEl = document.getElementById('weather-wind');
+            const weatherHumidityEl = document.getElementById('weather-humidity');
+            const weatherPressureEl = document.getElementById('weather-pressure');
+            const clientIdEl = document.getElementById('client-id');
 
-            const initializeDashboard = () => {
+
+            // Custom alert function
+            function showAlert(message) {
+                if (!messageModalContainer || !messageModalText || !messageModalCloseBtn) return;
+                
+                messageModalText.textContent = message;
+                messageModalContainer.classList.remove('hidden');
+                messageModalCloseBtn.onclick = () => {
+                    messageModalContainer.classList.add('hidden');
+                };
+            }
+
+            // Handle login form submission
+            loginForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const contact = document.getElementById('contact').value;
+                currentPlantType = document.getElementById('plant-type').value;
+
+                if (contact && currentPlantType) {
+                    localStorage.setItem('contact', contact);
+                    localStorage.setItem('plantType', currentPlantType);
+                    loginPage.classList.add('hidden');
+                    mainDashboard.classList.remove('hidden');
+                    initializeDashboard();
+                } else {
+                    showAlert('Please enter your email or phone number and select a plant type.');
+                }
+            });
+
+            // Check if user is already logged in
+            if (localStorage.getItem('contact')) {
                 loginPage.classList.add('hidden');
                 mainDashboard.classList.remove('hidden');
+                currentPlantType = localStorage.getItem('plantType');
+                initializeDashboard();
+            }
 
-                const clientIdEl = document.getElementById('client-id');
-                if (clientIdEl) clientIdEl.textContent = userId;
+            function initializeDashboard() {
+                // Initial UI update for trading panel
+                if (clientIdEl) clientIdEl.textContent = tradeState.clientId;
                 
+                const energyBalanceEl = document.getElementById('energy-balance');
+                if (energyBalanceEl) energyBalanceEl.textContent = `₹ ${tradeState.balance.toFixed(2)}`;
+                
+                renderTransactionHistory();
+                updatePlantUI();
+
+                // Re-initialize charts and add event listeners on dashboard load
                 initCharts();
-                // Set up the tabs
+                updateLiveMetrics();
+                setInterval(updateLiveMetrics, 5000);
+
+                // Panel Navigation
                 const tabs = document.querySelectorAll('.nav-tab');
                 const panels = document.querySelectorAll('.panel');
                 tabs.forEach(tab => {
@@ -1455,145 +1178,729 @@
                         
                         const activePanel = document.getElementById(panelId);
                         if (activePanel) activePanel.classList.add('active');
+                        
+                        // Re-render charts and trigger trading alerts when their panel becomes active
+                        if (panelId === 'analytics-panel' && weeklyConsumptionChart) {
+                            weeklyConsumptionChart.update();
+                            usageBreakdownChart.update();
+                        } else if (panelId === 'weather-panel' && solarForecastChart) {
+                            solarForecastChart.update();
+                        } else if (panelId === 'trading-panel') {
+                            startTradeAlerts();
+                        }
                     });
                 });
-            };
+            }
             
-            loginForm.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const contact = document.getElementById('contact').value;
-                appState.currentPlantType = document.getElementById('plant-type').value;
-
-                if (contact && appState.currentPlantType) {
-                    await setDoc(userDocRef, {
-                        contact: contact,
-                        plantType: appState.currentPlantType,
-                        mockBatteryLevel: 72,
-                        mockWeatherCondition: 'Clear Sky',
-                        currentLoad: 2.8,
-                        totalGeneration: 3.2,
-                        isEmergencyMode: false,
-                        tradeState: appState.tradeState,
-                        lastUpdated: Date.now()
-                    });
-                } else {
-                    // Replaced alert with custom modal
-                    const messageModalContainer = document.getElementById('message-modal-container');
-                    const messageModalText = document.getElementById('message-modal-text');
-                    if (messageModalText) messageModalText.textContent = 'Please enter all fields.';
-                    if (messageModalContainer) messageModalContainer.classList.remove('hidden');
-                }
-            });
-
-            document.getElementById('message-modal-close').addEventListener('click', () => {
-                document.getElementById('message-modal-container').classList.add('hidden');
-            });
-            
-            const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    Object.assign(appState, data);
-
-                    if (loginPage.classList.contains('hidden')) {
-                        updateDashboardUIFromData(appState);
-                    } else {
-                        initializeDashboard();
-                        updateDashboardUIFromData(appState);
-                    }
-                } else {
-                    loginPage.classList.remove('hidden');
-                    mainDashboard.classList.add('hidden');
-                }
-            });
-
-            setInterval(updateLiveMetrics, 5000);
-            
-            const showEmergencyAlert = () => {
+            // Function to show and hide the emergency alert
+            function showEmergencyAlert() {
                 emergencyAlertContainer.classList.remove('hidden');
                 alertSound.play().catch(e => console.error("Audio playback failed:", e));
-            };
+            }
 
-            const hideEmergencyAlert = () => {
+            function hideEmergencyAlert() {
                 emergencyAlertContainer.classList.add('hidden');
                 alertSound.pause();
                 alertSound.currentTime = 0;
-            };
+            }
 
-            emergencyAlertCloseBtn.addEventListener('click', hideEmergencyAlert);
+            // Listen for keydown events to trigger the emergency alert
+            window.addEventListener('keydown', (event) => {
+                if (event.key === 'e' || event.key === 'E') {
+                    const batteryLevel = parseInt(document.getElementById('battery-level-value').textContent);
+                    const weatherCondition = document.getElementById('weather-condition').textContent;
 
+                    // Check for low battery and low weather conditions
+                    const isLowBattery = batteryLevel < 30;
+                    const isPoorWeather = ['Rain', 'Cloudy'].includes(weatherCondition);
+                    
+                    if (isLowBattery && isPoorWeather) {
+                        showEmergencyAlert();
+                    }
+                }
+            });
+
+            // Close emergency alert
+            emergencyAlertCloseBtn.addEventListener('click', () => {
+                hideEmergencyAlert();
+            });
+
+            // Chatbot functionality
             chatBotIcon.addEventListener('click', () => {
                 chatContainer.classList.toggle('hidden');
             });
+
             closeChatBtn.addEventListener('click', () => {
                 chatContainer.classList.add('hidden');
             });
 
-            chatInput.addEventListener('keydown', async (event) => {
+            function addMessage(message, isUser) {
+                const messageElement = document.createElement('div');
+                messageElement.className = `chat-message-text ${isUser ? 'user-message' : 'bot-message'}`;
+                messageElement.textContent = message;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            chatInput.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') {
                     const userMessage = chatInput.value.trim().toLowerCase();
                     if (userMessage) {
                         addMessage(userMessage, true);
                         chatInput.value = '';
 
+                        // Process the user's message
                         if (userMessage === 'no sun no battery') {
-                            await setDoc(userDocRef, {
-                                mockBatteryLevel: 25,
-                                mockWeatherCondition: 'Cloudy',
-                                currentLoad: 1.5,
-                                isEmergencyMode: true,
-                                plantType: appState.currentPlantType
-                            }, { merge: true });
+                            const isLowBattery = mockBatteryLevel < 30;
+                            const isCloudy = mockWeatherCondition === 'Cloudy';
 
-                            addMessage("Emergency mode activated. Switching to grid power is recommended. You can now purchase energy from the grid.", false);
-                            showEmergencyAlert();
+                            if (isLowBattery && isCloudy) {
+                                isEmergencyMode = true;
+                                addMessage("Emergency mode activated. Switching to grid power is recommended. You can now purchase energy from the grid.", false);
+                                updateLiveMetrics(); // Trigger immediate update
+                                showEmergencyAlert();
+                            } else {
+                                isEmergencyMode = false;
+                                addMessage("Conditions are not met for this scenario. Current conditions: " + mockWeatherCondition + " weather and " + mockBatteryLevel + "% battery.", false);
+                            }
                         } else {
-                            addMessage("I can only process the 'no sun no battery' command right now.", false);
+                            isEmergencyMode = false;
+                            addMessage("I can only process the 'no sun no battery' command right now. Try simulating that condition!", false);
                         }
                     }
                 }
             });
-            
-            purchaseEnergyBtn.addEventListener('click', async () => {
-                if (appState.isEmergencyMode) {
-                    const purchaseQuantity = parseFloat(document.getElementById('current-load').textContent);
-                    const cost = purchaseQuantity * appState.tradeState.sellPrice; // Using sellPrice as a proxy for purchase price
-                    
-                    appState.tradeState.balance -= cost;
+
+            // Purchase from Grid Button Logic
+            purchaseEnergyBtn.addEventListener('click', () => {
+                if (isEmergencyMode) {
+                    const purchaseQuantity = parseFloat(currentLoad);
+                    const cost = purchaseQuantity * 6.50; // Use grid price
+                    tradeState.balance -= cost;
                     addTransaction('bought', purchaseQuantity, 'Grid');
 
-                    await setDoc(userDocRef, {
-                        isEmergencyMode: false,
-                        mockBatteryLevel: appState.mockBatteryLevel + purchaseQuantity * 5,
-                        currentLoad: parseFloat((Math.random() * 4 + 1).toFixed(1)),
-                        totalGeneration: appState.totalGeneration,
-                        plantType: appState.currentPlantType,
-                        tradeState: appState.tradeState
-                    }, { merge: true });
+                    // Update UI to show purchase
+                    const energyBalanceEl = document.getElementById('energy-balance');
+                    if (energyBalanceEl) energyBalanceEl.textContent = `₹ ${tradeState.balance.toFixed(2)}`;
                     
+                    // Show confirmation
                     addMessage(`Purchased ${purchaseQuantity.toFixed(1)} kWh from the grid for ₹${cost.toFixed(2)}.`, false);
                 } else {
                     addMessage("Emergency mode is not active. Please type 'no sun no battery' to activate it.", false);
                 }
             });
-            
-            sellForm.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const quantityInput = document.getElementById('sell-quantity');
-                const quantity = parseFloat(quantityInput.value);
-                
-                if (quantity > 0) {
-                    const amountEarned = quantity * appState.tradeState.sellPrice;
-                    appState.tradeState.balance += amountEarned;
-                    addTransaction('sold', quantity, 'Grid');
-                    quantityInput.value = '';
 
-                    await setDoc(userDocRef, {
-                        tradeState: appState.tradeState
-                    }, { merge: true });
-                } else {
-                    addMessage("Please enter a valid quantity to sell.", false);
+
+            function updatePlantUI() {
+                const sourceIconEl = document.getElementById('source-icon');
+                const sourceMainLabelEl = document.getElementById('source-main-label');
+                const sourceSubLabelEl = document.getElementById('source-sub-label');
+                const solarCard = document.getElementById('solar-card');
+                const windCard = document.getElementById('wind-card');
+
+                if (solarCard) solarCard.classList.add('hidden');
+                if (windCard) windCard.classList.add('hidden');
+                
+                let icon, mainLabel, subLabel;
+
+                switch (currentPlantType) {
+                    case 'Solar':
+                        icon = 'fas fa-solar-panel';
+                        mainLabel = 'Powering from Solar';
+                        subLabel = 'Your home is using clean energy from the sun.';
+                        if (solarCard) solarCard.classList.remove('hidden');
+                        break;
+                    case 'Wind':
+                        icon = 'fas fa-wind';
+                        mainLabel = 'Powering from Wind';
+                        subLabel = 'Your home is using energy generated by wind.';
+                        if (windCard) windCard.classList.remove('hidden');
+                        break;
+                    case 'Hybrid':
+                        icon = 'fas fa-cloud-sun-wind';
+                        mainLabel = 'Powering from Solar & Wind';
+                        subLabel = 'Your home is using a combination of solar and wind energy.';
+                        if (solarCard) solarCard.classList.remove('hidden'); // Show solar for hybrid
+                        if (windCard) windCard.classList.remove('hidden'); // Show wind for hybrid
+                        break;
+                    default:
+                        icon = 'fas fa-question-circle';
+                        mainLabel = 'Unknown Source';
+                        subLabel = 'Please select your plant type.';
+                        break;
                 }
-            });
+
+                if (sourceIconEl) {
+                    sourceIconEl.innerHTML = `<i class="${icon}"></i>`;
+                }
+                if (sourceMainLabelEl) {
+                    sourceMainLabelEl.textContent = mainLabel;
+                }
+                if (sourceSubLabelEl) {
+                    sourceSubLabelEl.textContent = subLabel;
+                }
+            }
+
+
+            function renderTransactionHistory() {
+                const transactionHistoryEl = document.getElementById('transaction-history');
+                if (!transactionHistoryEl) return;
+
+                transactionHistoryEl.innerHTML = '';
+                tradeState.history.forEach(trade => {
+                    const iconClass = trade.type === 'sold' ? 'fa-arrow-down text-red-500' : 'fa-arrow-up text-green-500';
+                    const message = trade.type === 'sold' ?
+                        `Sold ${trade.quantity.toFixed(1)} kWh to ${trade.to}` :
+                        `Bought ${trade.quantity.toFixed(1)} kWh from ${trade.from}`;
+
+                    const transactionEl = document.createElement('div');
+                    transactionEl.className = 'flex justify-between items-center p-2 rounded-lg bg-gray-100 text-sm';
+                    transactionEl.innerHTML = `
+                        <span><i class="fas ${iconClass} mr-2"></i>${message}</span>
+                        <span class="font-mono text-xs text-gray-600">${trade.time}</span>
+                    `;
+                    transactionHistoryEl.appendChild(transactionEl);
+                });
+            }
+
+            function updateBalance(amount) {
+                tradeState.balance += amount;
+                const energyBalanceEl = document.getElementById('energy-balance');
+                if (energyBalanceEl) {
+                    energyBalanceEl.textContent = `₹ ${tradeState.balance.toFixed(2)}`;
+                }
+            }
+
+            function addTransaction(type, quantity, toFrom) {
+                tradeState.history.unshift({
+                    type: type,
+                    quantity: quantity,
+                    [type === 'sold' ? 'to' : 'from']: toFrom,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                if (tradeState.history.length > 5) {
+                    tradeState.history.pop();
+                }
+                renderTransactionHistory();
+            }
+            
+            // Chart Initialization function
+            function initCharts() {
+                const predictionCtx = document.getElementById('generation-prediction-chart');
+                if (predictionCtx) {
+                    predictionChart = new Chart(predictionCtx.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: ['1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
+                            datasets: [{
+                                label: 'Predicted Generation (kW)',
+                                data: [4.1, 4.5, 4.2, 3.1, 1.8, 0.5],
+                                borderColor: '#4caf50',
+                                backgroundColor: (context) => {
+                                    const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 120);
+                                    gradient.addColorStop(0, 'rgba(76, 175, 80, 0.4)');
+                                    gradient.addColorStop(1, 'rgba(76, 175, 80, 0)');
+                                    return gradient;
+                                },
+                                fill: true,
+                                tension: 0.4,
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#4caf50'
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => `Generation: ${context.raw.toFixed(1)} kW` } } }, scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
+                    });
+                }
+                
+                // Analytics Charts
+                const weeklyConsumptionCtx = document.getElementById('weekly-consumption-chart');
+                if (weeklyConsumptionCtx) {
+                    weeklyConsumptionChart = new Chart(weeklyConsumptionCtx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            datasets: [{
+                                label: 'Consumption (kWh)',
+                                data: [12, 15, 14, 18, 16, 20, 19],
+                                backgroundColor: '#3b82f6',
+                                borderRadius: 5
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+                    });
+                }
+
+                const usageBreakdownCtx = document.getElementById('usage-breakdown-chart');
+                if (usageBreakdownCtx) {
+                    usageBreakdownChart = new Chart(usageBreakdownCtx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['HVAC', 'Appliances', 'Lighting', 'Electronics'],
+                            datasets: [{
+                                data: [45, 30, 15, 10],
+                                backgroundColor: ['#d32f2f', '#f57c00', '#4caf50', '#10b981'],
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+                    });
+                }
+                // Weather Forecast Chart
+                const solarForecastCtx = document.getElementById('solar-forecast-chart');
+                if (solarForecastCtx) {
+                    solarForecastChart = new Chart(solarForecastCtx.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'],
+                            datasets: [{
+                                label: 'Solar Generation Forecast (kWh)',
+                                data: [18.6, 15, 12, 16, 22, 10, 21],
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+                    });
+                }
+            }
+
+
+            // Live Data Simulation Function
+            const updateLiveMetrics = () => {
+                const now = new Date();
+                const lastUpdatedEl = document.getElementById('last-updated');
+                if (lastUpdatedEl) {
+                    lastUpdatedEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                }
+
+                // Simulate data
+                if (!isEmergencyMode) {
+                   currentLoad = parseFloat((Math.random() * 4 + 1).toFixed(1));
+                } else {
+                   currentLoad = parseFloat((Math.random() * 2 + 0.5).toFixed(1));
+                }
+
+                let solarOutput = 0, windOutput = 0;
+
+                // Simulate low battery and cloudy weather for the bot logic test
+                if (isEmergencyMode) {
+                    solarOutput = 0.1;
+                    windOutput = 0.1;
+                    mockBatteryLevel = Math.max(10, mockBatteryLevel - 5); // Slowly drain battery
+                    mockWeatherCondition = 'Cloudy';
+                } else {
+                    switch(currentPlantType) {
+                        case 'Solar':
+                            solarOutput = parseFloat((Math.random() * 5).toFixed(1));
+                            break;
+                        case 'Wind':
+                            windOutput = parseFloat((Math.random() * 5).toFixed(1));
+                            break;
+                        case 'Hybrid':
+                            solarOutput = parseFloat((Math.random() * 3).toFixed(1));
+                            windOutput = parseFloat((Math.random() * 3).toFixed(1));
+                            break;
+                    }
+                    mockBatteryLevel = Math.max(0, Math.min(100, mockBatteryLevel + (solarOutput + windOutput - currentLoad) * 2));
+                    const weatherConditions = ['Clear Sky', 'Partly Cloudy', 'Cloudy', 'Rain'];
+                    mockWeatherCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+                }
+
+                const totalGeneration = solarOutput + windOutput;
+                
+                const batteryLevelEl = document.getElementById('battery-level-value');
+                const batteryLevel = mockBatteryLevel;
+                
+                const efficiencyScoreEl = document.getElementById('energy-efficiency-score');
+                const efficiencyScore = efficiencyScoreEl ? Math.max(75, Math.min(98, parseInt(efficiencyScoreEl.textContent) + (Math.random() * 4 - 2))) : 0;
+                
+                const carbonSaved = (totalGeneration * 0.5).toFixed(1);
+
+                // Determine energy source for display
+                let source = 'Grid';
+                let icon = 'fas fa-warehouse';
+                let mainLabel = 'Powering from Grid';
+                let subLabel = 'Purchasing power from the grid to meet your demand.';
+                let color = 'text-blue-600';
+
+                if (isEmergencyMode) {
+                    source = 'Grid';
+                    mainLabel = 'Emergency Grid Purchase';
+                    subLabel = 'Your system is purchasing power from the grid.';
+                    const purchaseEnergyBtn = document.getElementById('purchase-energy-btn');
+                    if(purchaseEnergyBtn) purchaseEnergyBtn.classList.remove('hidden');
+                } else if (totalGeneration >= currentLoad) {
+                    source = currentPlantType;
+                    const purchaseEnergyBtn = document.getElementById('purchase-energy-btn');
+                    if(purchaseEnergyBtn) purchaseEnergyBtn.classList.add('hidden');
+                    switch(currentPlantType) {
+                        case 'Solar':
+                            icon = 'fas fa-solar-panel';
+                            mainLabel = 'Powering from Solar';
+                            subLabel = 'Your home is using clean, free energy from the sun.';
+                            color = 'text-yellow-600';
+                            break;
+                        case 'Wind':
+                            icon = 'fas fa-wind';
+                            mainLabel = 'Powering from Wind';
+                            subLabel = 'Your home is using energy generated by wind.';
+                            color = 'text-blue-600';
+                            break;
+                        case 'Hybrid':
+                            icon = 'fas fa-cloud-sun-wind';
+                            mainLabel = 'Powering from Solar & Wind';
+                            subLabel = 'Your home is using a combination of solar and wind energy.';
+                            color = 'text-green-600';
+                            break;
+                    }
+
+                    if (batteryLevel >= 95) {
+                        source = 'Selling';
+                        icon = 'fas fa-exchange-alt';
+                        mainLabel = 'Selling to Grid';
+                        subLabel = `Generating a surplus! Selling clean energy to the grid.`;
+                        color = 'text-purple-600';
+                    }
+                }
+                else if (currentLoad > totalGeneration && batteryLevel > 20) {
+                    source = 'Battery';
+                    icon = 'fas fa-car-battery';
+                    mainLabel = 'Powering from Battery';
+                    subLabel = 'Using stored energy to power your home and avoid grid costs.';
+                    color = 'text-green-600';
+                    const purchaseEnergyBtn = document.getElementById('purchase-energy-btn');
+                    if(purchaseEnergyBtn) purchaseEnergyBtn.classList.add('hidden');
+                }
+
+                // Update UI
+                const currentLoadEl = document.getElementById('current-load');
+                if (currentLoadEl) currentLoadEl.textContent = currentLoad;
+                
+                const consumptionProgressEl = document.getElementById('consumption-progress');
+                if (consumptionProgressEl) consumptionProgressEl.style.width = `${(currentLoad / 5) * 100}%`;
+                
+                if (currentPlantType === 'Solar' || currentPlantType === 'Hybrid') {
+                    const solarOutputEl = document.getElementById('solar-current-output');
+                    if (solarOutputEl) solarOutputEl.textContent = solarOutput;
+                    
+                    const solarProgressEl = document.getElementById('solar-progress');
+                    if (solarProgressEl) solarProgressEl.style.width = `${(solarOutput / 5) * 100}%`;
+                    
+                    const solarTodayGenEl = document.getElementById('solar-today-gen');
+                    if (solarTodayGenEl) solarTodayGenEl.textContent = `${(parseFloat(solarTodayGenEl.textContent) + solarOutput).toFixed(1)} kWh Today`;
+                }
+                if (currentPlantType === 'Wind' || currentPlantType === 'Hybrid') {
+                    const windOutputEl = document.getElementById('wind-current-output');
+                    if (windOutputEl) windOutputEl.textContent = windOutput;
+                    
+                    const windProgressEl = document.getElementById('wind-progress');
+                    if (windProgressEl) windProgressEl.style.width = `${(windOutput / 5) * 100}%`;
+                    
+                    const windTodayGenEl = document.getElementById('wind-today-gen');
+                    if (windTodayGenEl) windTodayGenEl.textContent = `${(parseFloat(windTodayGenEl.textContent) + windOutput).toFixed(1)} kWh Today`;
+                }
+                
+                if (batteryLevelEl) batteryLevelEl.textContent = Math.round(batteryLevel);
+                const batteryProgressEl = document.getElementById('battery-progress');
+                if (batteryProgressEl) batteryProgressEl.style.width = `${batteryLevel}%`;
+                
+                if (efficiencyScoreEl) efficiencyScoreEl.textContent = efficiencyScore.toFixed(1);
+                
+                const carbonSavedEl = document.getElementById('carbon-saved');
+                if (carbonSavedEl) carbonSavedEl.textContent = carbonSaved;
+                
+                const treesPlantedEl = document.getElementById('trees-planted');
+                if (treesPlantedEl) treesPlantedEl.textContent = Math.round(carbonSaved / 1.8);
+                
+                // Update Energy Source Card
+                const sourceIconEl = document.getElementById('source-icon');
+                if (sourceIconEl) sourceIconEl.innerHTML = `<i class="${icon}"></i>`;
+                if (sourceIconEl) sourceIconEl.className = `text-4xl ${color}`;
+                
+                const sourceMainLabelEl = document.getElementById('source-main-label');
+                if (sourceMainLabelEl) sourceMainLabelEl.textContent = mainLabel;
+                if (sourceMainLabelEl) sourceMainLabelEl.className = `text-xl md:text-2xl font-bold ${color}`;
+                
+                const sourceSubLabelEl = document.getElementById('source-sub-label');
+                if (sourceSubLabelEl) sourceSubLabelEl.textContent = subLabel;
+
+                // Update Energy Flow Diagram (on Energy Flow panel)
+                const flowSolarOutputEl = document.getElementById('flow-solar-output');
+                if (flowSolarOutputEl) flowSolarOutputEl.textContent = `${solarOutput} kW`;
+                
+                const flowWindOutputEl = document.getElementById('flow-wind-output');
+                if (flowWindOutputEl) flowWindOutputEl.textContent = `${windOutput} kW`;
+                
+                const flowBatteryStatusEl = document.getElementById('flow-battery-status');
+                if (flowBatteryStatusEl) flowBatteryStatusEl.textContent = `${Math.round(batteryLevel)}%`;
+                
+                const flowHomeLoadEl = document.getElementById('flow-home-load');
+                if (flowHomeLoadEl) flowHomeLoadEl.textContent = `${currentLoad} kW`;
+                
+                const flowLoadSourceEl = document.getElementById('flow-load-source');
+                if (flowLoadSourceEl) flowLoadSourceEl.textContent = `Sourced from: ${source}`;
+                
+                const flowSource1El = document.getElementById('flow-source-1');
+                if (flowSource1El) flowSource1El.classList.toggle('hidden', currentPlantType !== 'Solar' && currentPlantType !== 'Hybrid');
+                
+                const flowSource2El = document.getElementById('flow-source-2');
+                if (flowSource2El) flowSource2El.classList.toggle('hidden', currentPlantType !== 'Wind' && currentPlantType !== 'Hybrid');
+                
+                // Reset all flow line classes
+                document.querySelectorAll('.energy-flow-path').forEach(el => {
+                    el.classList.add('hidden');
+                    el.classList.remove('flow-line-green', 'flow-line-yellow', 'flow-line-blue', 'flow-line-red');
+                });
+                
+                // Show the appropriate path and add the animation class
+                const getPathElement = (pathId) => document.getElementById(pathId);
+
+                switch (source) {
+                    case 'Solar':
+                        const solarPath = getPathElement('solar-to-home-path');
+                        if(solarPath) {
+                            solarPath.classList.remove('hidden');
+                            solarPath.classList.add('flow-line-yellow');
+                        }
+                        break;
+                    case 'Wind':
+                        const windPath = getPathElement('wind-to-home-path');
+                        if(windPath) {
+                            windPath.classList.remove('hidden');
+                            windPath.classList.add('flow-line-blue');
+                        }
+                        break;
+                    case 'Hybrid':
+                        const hybridPath = getPathElement('solar-to-home-path'); // Use solar path for hybrid
+                        if(hybridPath) {
+                            hybridPath.classList.remove('hidden');
+                            hybridPath.classList.add('flow-line-green');
+                        }
+                        break;
+                    case 'Battery':
+                        const batteryPath = getPathElement('battery-to-home-path');
+                        if(batteryPath) {
+                            batteryPath.classList.remove('hidden');
+                            batteryPath.classList.add('flow-line-green');
+                        }
+                        break;
+                    case 'Grid':
+                        const gridPath = getPathElement('grid-to-home-path');
+                        if(gridPath) {
+                            gridPath.classList.remove('hidden');
+                            gridPath.classList.add('flow-line-blue');
+                        }
+                        break;
+                    case 'Selling':
+                        const sellPath = getPathElement('solar-to-grid-path'); // Assumes selling from solar
+                        if (sellPath) {
+                            sellPath.classList.remove('hidden');
+                            sellPath.classList.add('flow-line-red');
+                        }
+                        break;
+                }
+                
+                // Simulate new grid and meter data
+                const gridCurrent = (Math.random() * 5 + 10).toFixed(1);
+                const gridVoltage = (Math.random() * 10 + 235).toFixed(0);
+                const monthlyBill = (parseFloat(document.getElementById('today-usage').textContent) * 30 * 6.50).toFixed(2);
+                
+                const gridCurrentEl = document.getElementById('grid-current');
+                if (gridCurrentEl) gridCurrentEl.textContent = `${gridCurrent}A`;
+                
+                const gridVoltageEl = document.getElementById('grid-voltage');
+                if (gridVoltageEl) gridVoltageEl.textContent = `${gridVoltage}V`;
+
+                const gridBillEl = document.getElementById('grid-bill');
+                if (gridBillEl) gridBillEl.textContent = `₹ ${monthlyBill}`;
+                
+                const meterCurrentEl = document.getElementById('meter-current');
+                if (meterCurrentEl) meterCurrentEl.textContent = `${(currentLoad / (gridVoltage / 1000)).toFixed(1)}A`;
+                
+                const meterVoltageEl = document.getElementById('meter-voltage');
+                if (meterVoltageEl) meterVoltageEl.textContent = `${gridVoltage}V`;
+
+
+                // Simulate alerts
+                const anomalyAlert = document.getElementById('anomaly-alert');
+                if (anomalyAlert) {
+                    if (Math.random() < 0.1) {
+                        anomalyAlert.classList.remove('hidden');
+                    } else {
+                        anomalyAlert.classList.add('hidden');
+                    }
+                }
+
+                const batteryAlert = document.getElementById('battery-health-alert');
+                if (batteryAlert) {
+                    if (parseInt(batteryLevel) < 20 || parseInt(batteryLevel) > 95) {
+                        batteryAlert.classList.remove('hidden');
+                    } else {
+                        batteryAlert.classList.add('hidden');
+                    }
+                }
+
+                // AI recommendation logic
+                const aiRecommendationEl = document.getElementById('ai-recommendation');
+                if (isEmergencyMode) {
+                    aiRecommendationEl.textContent = 'You have to purchase energy from the grid. Turn on lights, but do not use heavy appliances.';
+                    aiRecommendationEl.parentElement.classList.remove('bg-blue-50', 'border-blue-500');
+                    aiRecommendationEl.parentElement.classList.add('bg-red-50', 'border-red-500');
+                    aiRecommendationEl.previousElementSibling.firstElementChild.className = 'fas fa-exclamation-triangle';
+                    aiRecommendationEl.previousElementSibling.classList.remove('text-blue-800');
+                    aiRecommendationEl.previousElementSibling.classList.add('text-red-800');
+                    aiRecommendationEl.classList.remove('text-blue-700');
+                    aiRecommendationEl.classList.add('text-red-700');
+                } else {
+                    const netSurplus = (totalGeneration - currentLoad).toFixed(1);
+                    const recommendations = [
+                        `Current generation surplus of ${netSurplus} kW. Consider charging your EV or running heavy appliances.`,
+                        `Your battery level is at ${batteryLevel}%. We recommend charging fully before nightfall.`,
+                        `Predicted cloud cover tomorrow. Adjust your energy usage plan to minimize grid dependency.`,
+                        `Excellent efficiency! You've offset ${carbonSaved} kg of CO₂ today.`
+                    ];
+                    if (aiRecommendationEl) {
+                        aiRecommendationEl.textContent = recommendations[Math.floor(Math.random() * recommendations.length)];
+                        aiRecommendationEl.parentElement.classList.add('bg-blue-50', 'border-blue-500');
+                        aiRecommendationEl.parentElement.classList.remove('bg-red-50', 'border-red-500');
+                        aiRecommendationEl.previousElementSibling.firstElementChild.className = 'fas fa-robot';
+                        aiRecommendationEl.previousElementSibling.classList.add('text-blue-800');
+                        aiRecommendationEl.previousElementSibling.classList.remove('text-red-800');
+                        aiRecommendationEl.classList.add('text-blue-700');
+                        aiRecommendationEl.classList.remove('text-red-700');
+                    }
+                }
+
+
+                const analyticsGenEl = document.getElementById('analytics-gen');
+                if (analyticsGenEl) {
+                    analyticsGenEl.textContent = `${totalGeneration.toFixed(1)} kWh`;
+                }
+                const analyticsConEl = document.getElementById('analytics-con');
+                if (analyticsConEl) {
+                    analyticsConEl.textContent = `${currentLoad.toFixed(1)} kWh`;
+                }
+                const analyticsSurplusEl = document.getElementById('analytics-surplus');
+                if (analyticsSurplusEl) {
+                    analyticsSurplusEl.textContent = `${(totalGeneration - currentLoad).toFixed(1)} kWh`;
+                }
+            };
+
+            // Weather Data (Simulated for this example)
+            const updateWeather = () => {
+                const weatherConditions = ['Clear Sky', 'Partly Cloudy', 'Cloudy', 'Rain'];
+                const selectedCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+                
+                mockWeatherCondition = selectedCondition;
+
+                const mockWeather = {
+                    temp: (Math.random() * 4 + 27).toFixed(1),
+                    condition: selectedCondition,
+                    icon: 'fas fa-sun'
+                };
+                
+                switch (selectedCondition) {
+                    case 'Cloudy':
+                        mockWeather.icon = 'fas fa-cloud';
+                        break;
+                    case 'Rain':
+                        mockWeather.icon = 'fas fa-cloud-rain';
+                        break;
+                    case 'Partly Cloudy':
+                        mockWeather.icon = 'fas fa-cloud-sun';
+                        break;
+                    default:
+                        mockWeather.icon = 'fas fa-sun';
+                        break;
+                }
+
+                const weatherTempEl = document.getElementById('weather-temp');
+                if (weatherTempEl) weatherTempEl.textContent = mockWeather.temp;
+                
+                const weatherConditionEl = document.getElementById('weather-condition');
+                if (weatherConditionEl) weatherConditionEl.textContent = mockWeather.condition;
+                
+                const weatherIconEl = document.getElementById('weather-icon');
+                if (weatherIconEl) weatherIconEl.className = `text-5xl md:text-6xl text-yellow-500 ${mockWeather.icon}`;
+            };
+            updateWeather();
+            setInterval(updateWeather, 300000);
+
+            // Manual Sell Form Submission
+            const sellForm = document.getElementById('sell-form');
+            if (sellForm) {
+                sellForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const quantityInput = document.getElementById('sell-quantity');
+                    const quantity = parseFloat(quantityInput.value);
+                    
+                    if (quantity > 0) {
+                        const amountEarned = quantity * tradeState.sellPrice;
+                        updateBalance(amountEarned);
+                        addTransaction('sold', quantity, 'Grid');
+                        quantityInput.value = '';
+                    }
+                });
+            }
+
+            // Automated Trade Alert
+            function showTradeAlert(quantity, client) {
+                const tradeAlertMessageEl = document.getElementById('trade-alert-message');
+                if (tradeAlertMessageEl) {
+                    tradeAlertMessageEl.textContent = `Client ${client} needs ${quantity.toFixed(1)} kWh. Sell for ₹${(quantity * tradeState.sellPrice).toFixed(2)}?`;
+                }
+                const tradeAlertContainer = document.getElementById('trade-alert-container');
+                if (tradeAlertContainer) {
+                    tradeAlertContainer.classList.remove('hidden');
+                }
+
+                const handleTrade = (action) => {
+                    if (action === 'accept') {
+                        updateBalance(quantity * tradeState.sellPrice);
+                        addTransaction('sold', quantity, `Client ${client}`);
+                    }
+                    if (tradeAlertContainer) {
+                        tradeAlertContainer.classList.add('hidden');
+                    }
+                    const acceptTradeBtn = document.getElementById('accept-trade-btn');
+                    if (acceptTradeBtn) acceptTradeBtn.removeEventListener('click', acceptHandler);
+                    const declineTradeBtn = document.getElementById('decline-trade-btn');
+                    if (declineTradeBtn) declineTradeBtn.removeEventListener('click', declineHandler);
+                    clearTimeout(tradeAlertTimeout);
+                    startTradeAlerts();
+                };
+
+                const acceptHandler = () => handleTrade('accept');
+                const declineHandler = () => handleTrade('decline');
+
+                const acceptTradeBtn = document.getElementById('accept-trade-btn');
+                if (acceptTradeBtn) acceptTradeBtn.addEventListener('click', acceptHandler);
+                const declineTradeBtn = document.getElementById('decline-trade-btn');
+                if (declineTradeBtn) declineTradeBtn.addEventListener('click', declineHandler);
+                
+                tradeAlertTimeout = setTimeout(() => {
+                    if (tradeAlertContainer) {
+                        tradeAlertContainer.classList.add('hidden');
+                    }
+                    startTradeAlerts();
+                }, 20000); // Alert disappears after 20 seconds
+            }
+
+            // Start a recurring timer for trade alerts
+            function startTradeAlerts() {
+                const tradingPanel = document.getElementById('trading-panel');
+                if (tradingPanel && tradingPanel.classList.contains('active')) {
+                    const nextAlert = Math.random() * 20000 + 10000; // 10-30 seconds
+                    setTimeout(() => {
+                        const randomQuantity = Math.random() * 3 + 0.5;
+                        const randomClient = Math.random().toString(16).slice(2, 6);
+                        showTradeAlert(randomQuantity, randomClient);
+                    }, nextAlert);
+                }
+            }
         });
     </script>
 </body>
