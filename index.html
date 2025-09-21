@@ -1064,8 +1064,8 @@
                     icon = 'fas fa-cloud-sun-wind';
                     mainLabel = 'Powering from Solar & Wind';
                     subLabel = 'Your home is using a combination of solar and wind energy.';
-                    if (solarCard) solarCard.classList.remove('hidden');
-                    if (windCard) windCard.classList.remove('hidden');
+                    if (solarCard) solarCard.classList.remove('hidden'); // Show solar for hybrid
+                    if (windCard) windCard.classList.remove('hidden'); // Show wind for hybrid
                     break;
                 default:
                     icon = 'fas fa-question-circle';
@@ -1310,7 +1310,7 @@
 
         const initCharts = () => {
             const predictionCtx = document.getElementById('generation-prediction-chart');
-            if (predictionCtx && !predictionChart) {
+            if (predictionCtx) {
                 predictionChart = new Chart(predictionCtx.getContext('2d'), {
                     type: 'line',
                     data: {
@@ -1337,7 +1337,7 @@
             }
             
             const weeklyConsumptionCtx = document.getElementById('weekly-consumption-chart');
-            if (weeklyConsumptionCtx && !weeklyConsumptionChart) {
+            if (weeklyConsumptionCtx) {
                 weeklyConsumptionChart = new Chart(weeklyConsumptionCtx.getContext('2d'), {
                     type: 'bar',
                     data: {
@@ -1354,7 +1354,7 @@
             }
 
             const usageBreakdownCtx = document.getElementById('usage-breakdown-chart');
-            if (usageBreakdownCtx && !usageBreakdownChart) {
+            if (usageBreakdownCtx) {
                 usageBreakdownChart = new Chart(usageBreakdownCtx.getContext('2d'), {
                     type: 'doughnut',
                     data: {
@@ -1369,7 +1369,7 @@
                 });
             }
             const solarForecastCtx = document.getElementById('solar-forecast-chart');
-            if (solarForecastCtx && !solarForecastChart) {
+            if (solarForecastCtx) {
                 solarForecastChart = new Chart(solarForecastCtx.getContext('2d'), {
                     type: 'line',
                     data: {
