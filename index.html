@@ -286,7 +286,6 @@
             font-size: 0.875rem;
         }
 
-
         /* Responsive chart container */
         .chart-container {
             position: relative;
@@ -370,6 +369,25 @@
             z-index: 100;
             animation: pulse 1.5s infinite;
         }
+
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+            .data-value {
+                font-size: 1.5rem;
+            }
+            
+            .glass-card {
+                border-radius: 16px;
+            }
+            
+            .energy-score {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 100px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -383,6 +401,7 @@
                 <div class="mb-4">
                     <label for="contact" class="block text-left text-sm font-medium text-gray-700 mb-2">Email or Phone Number</label>
                     <input type="text" id="contact" name="contact" placeholder="Enter your email or phone" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                    <div id="contact-error" class="text-red-500 text-xs mt-1 hidden">Please enter a valid email or phone number</div>
                 </div>
                 <div class="mb-6">
                     <label for="plant-type" class="block text-left text-sm font-medium text-gray-700 mb-2">My Power Plant Type</label>
@@ -392,6 +411,7 @@
                         <option value="Wind">Wind Turbine</option>
                         <option value="Hybrid">Hybrid (Solar & Wind)</option>
                     </select>
+                    <div id="plant-type-error" class="text-red-500 text-xs mt-1 hidden">Please select a plant type</div>
                 </div>
                 <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition">
                     Login
@@ -1031,6 +1051,8 @@
         let mockWeatherCondition = 'Clear Sky';
         let mockBatteryLevel = 72;
         let currentLoad = 2.8;
+        let dailyGeneration = { solar: 18.6, wind: 0 };
+        let dailyConsumption = 15.4;
         let predictionChart, weeklyConsumptionChart, usageBreakdownChart, solarForecastChart;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1113,7 +1135,13 @@
             const weatherHumidityEl = document.getElementById('weather-humidity');
             const weatherPressureEl = document.getElementById('weather-pressure');
             const clientIdEl = document.getElementById('client-id');
+            const todayUsageEl = document.getElementById('today-usage');
 
+            // Form validation elements
+            const contactInput = document.getElementById('contact');
+            const contactError = document.getElementById('contact-error');
+            const plantTypeSelect = document.getElementById('plant-type');
+            const plantTypeError = document.getElementById('plant-type-error');
 
             // Custom alert function
             function showAlert(message) {
@@ -1126,20 +1154,46 @@
                 };
             }
 
+            // Form validation
+            function validateForm() {
+                let isValid = true;
+                
+                // Validate contact
+                if (!contactInput.value.trim()) {
+                    contactError.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    contactError.classList.add('hidden');
+                }
+                
+                // Validate plant type
+                if (!plantTypeSelect.value) {
+                    plantTypeError.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    plantTypeError.classList.add('hidden');
+                }
+                
+                return isValid;
+            }
+
             // Handle login form submission
             loginForm.addEventListener('submit', (event) => {
                 event.preventDefault();
-                const contact = document.getElementById('contact').value;
-                currentPlantType = document.getElementById('plant-type').value;
+                
+                if (validateForm()) {
+                    const contact = contactInput.value;
+                    currentPlantType = plantTypeSelect.value;
 
-                if (contact && currentPlantType) {
-                    localStorage.setItem('contact', contact);
-                    localStorage.setItem('plantType', currentPlantType);
-                    loginPage.classList.add('hidden');
-                    mainDashboard.classList.remove('hidden');
-                    initializeDashboard();
-                } else {
-                    showAlert('Please enter your email or phone number and select a plant type.');
+                    if (contact && currentPlantType) {
+                        localStorage.setItem('contact', contact);
+                        localStorage.setItem('plantType', currentPlantType);
+                        loginPage.classList.add('hidden');
+                        mainDashboard.classList.remove('hidden');
+                        initializeDashboard();
+                    } else {
+                        showAlert('Please enter your email or phone number and select a plant type.');
+                    }
                 }
             });
 
@@ -1195,13 +1249,21 @@
             // Function to show and hide the emergency alert
             function showEmergencyAlert() {
                 emergencyAlertContainer.classList.remove('hidden');
-                alertSound.play().catch(e => console.error("Audio playback failed:", e));
+                try {
+                    alertSound.play().catch(e => console.error("Audio playback failed:", e));
+                } catch (e) {
+                    console.error("Audio playback error:", e);
+                }
             }
 
             function hideEmergencyAlert() {
                 emergencyAlertContainer.classList.add('hidden');
-                alertSound.pause();
-                alertSound.currentTime = 0;
+                try {
+                    alertSound.pause();
+                    alertSound.currentTime = 0;
+                } catch (e) {
+                    console.error("Audio control error:", e);
+                }
             }
 
             // Listen for keydown events to trigger the emergency alert
@@ -1519,6 +1581,15 @@
                 
                 const carbonSaved = (totalGeneration * 0.5).toFixed(1);
 
+                // Update daily totals
+                dailyConsumption += currentLoad;
+                if (currentPlantType === 'Solar' || currentPlantType === 'Hybrid') {
+                    dailyGeneration.solar += solarOutput;
+                }
+                if (currentPlantType === 'Wind' || currentPlantType === 'Hybrid') {
+                    dailyGeneration.wind += windOutput;
+                }
+
                 // Determine energy source for display
                 let source = 'Grid';
                 let icon = 'fas fa-warehouse';
@@ -1590,7 +1661,7 @@
                     if (solarProgressEl) solarProgressEl.style.width = `${(solarOutput / 5) * 100}%`;
                     
                     const solarTodayGenEl = document.getElementById('solar-today-gen');
-                    if (solarTodayGenEl) solarTodayGenEl.textContent = `${(parseFloat(solarTodayGenEl.textContent) + solarOutput).toFixed(1)} kWh Today`;
+                    if (solarTodayGenEl) solarTodayGenEl.textContent = `${dailyGeneration.solar.toFixed(1)} kWh Today`;
                 }
                 if (currentPlantType === 'Wind' || currentPlantType === 'Hybrid') {
                     const windOutputEl = document.getElementById('wind-current-output');
@@ -1600,7 +1671,7 @@
                     if (windProgressEl) windProgressEl.style.width = `${(windOutput / 5) * 100}%`;
                     
                     const windTodayGenEl = document.getElementById('wind-today-gen');
-                    if (windTodayGenEl) windTodayGenEl.textContent = `${(parseFloat(windTodayGenEl.textContent) + windOutput).toFixed(1)} kWh Today`;
+                    if (windTodayGenEl) windTodayGenEl.textContent = `${dailyGeneration.wind.toFixed(1)} kWh Today`;
                 }
                 
                 if (batteryLevelEl) batteryLevelEl.textContent = Math.round(batteryLevel);
@@ -1609,11 +1680,12 @@
                 
                 if (efficiencyScoreEl) efficiencyScoreEl.textContent = efficiencyScore.toFixed(1);
                 
-                const carbonSavedEl = document.getElementById('carbon-saved');
-                if (carbonSavedEl) carbonSavedEl.textContent = carbonSaved;
+                if (carbonSavedEl) carbonSavedEl.textContent = ((dailyGeneration.solar + dailyGeneration.wind) * 0.5).toFixed(1);
                 
                 const treesPlantedEl = document.getElementById('trees-planted');
-                if (treesPlantedEl) treesPlantedEl.textContent = Math.round(carbonSaved / 1.8);
+                if (treesPlantedEl) treesPlantedEl.textContent = Math.round(((dailyGeneration.solar + dailyGeneration.wind) * 0.5) / 1.8);
+                
+                if (todayUsageEl) todayUsageEl.textContent = `${dailyConsumption.toFixed(1)} kWh Today`;
                 
                 // Update Energy Source Card
                 const sourceIconEl = document.getElementById('source-icon');
@@ -1706,7 +1778,7 @@
                 // Simulate new grid and meter data
                 const gridCurrent = (Math.random() * 5 + 10).toFixed(1);
                 const gridVoltage = (Math.random() * 10 + 235).toFixed(0);
-                const monthlyBill = (parseFloat(document.getElementById('today-usage').textContent) * 30 * 6.50).toFixed(2);
+                const monthlyBill = (dailyConsumption * 30 * 6.50).toFixed(2);
                 
                 const gridCurrentEl = document.getElementById('grid-current');
                 if (gridCurrentEl) gridCurrentEl.textContent = `${gridCurrent}A`;
@@ -1787,47 +1859,38 @@
                 if (analyticsSurplusEl) {
                     analyticsSurplusEl.textContent = `${(totalGeneration - currentLoad).toFixed(1)} kWh`;
                 }
+                
+                // Update weather display
+                updateWeather();
             };
 
             // Weather Data (Simulated for this example)
             const updateWeather = () => {
-                const weatherConditions = ['Clear Sky', 'Partly Cloudy', 'Cloudy', 'Rain'];
-                const selectedCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-                
-                mockWeatherCondition = selectedCondition;
-
-                const mockWeather = {
-                    temp: (Math.random() * 4 + 27).toFixed(1),
-                    condition: selectedCondition,
-                    icon: 'fas fa-sun'
-                };
-                
-                switch (selectedCondition) {
-                    case 'Cloudy':
-                        mockWeather.icon = 'fas fa-cloud';
-                        break;
-                    case 'Rain':
-                        mockWeather.icon = 'fas fa-cloud-rain';
-                        break;
-                    case 'Partly Cloudy':
-                        mockWeather.icon = 'fas fa-cloud-sun';
-                        break;
-                    default:
-                        mockWeather.icon = 'fas fa-sun';
-                        break;
-                }
-
                 const weatherTempEl = document.getElementById('weather-temp');
-                if (weatherTempEl) weatherTempEl.textContent = mockWeather.temp;
+                if (weatherTempEl) weatherTempEl.textContent = (Math.random() * 4 + 27).toFixed(1);
                 
                 const weatherConditionEl = document.getElementById('weather-condition');
-                if (weatherConditionEl) weatherConditionEl.textContent = mockWeather.condition;
+                if (weatherConditionEl) weatherConditionEl.textContent = mockWeatherCondition;
                 
                 const weatherIconEl = document.getElementById('weather-icon');
-                if (weatherIconEl) weatherIconEl.className = `text-5xl md:text-6xl text-yellow-500 ${mockWeather.icon}`;
+                if (weatherIconEl) {
+                    switch (mockWeatherCondition) {
+                        case 'Cloudy':
+                            weatherIconEl.className = 'text-5xl md:text-6xl text-gray-500 fas fa-cloud';
+                            break;
+                        case 'Rain':
+                            weatherIconEl.className = 'text-5xl md:text-6xl text-blue-500 fas fa-cloud-rain';
+                            break;
+                        case 'Partly Cloudy':
+                            weatherIconEl.className = 'text-5xl md:text-6xl text-yellow-500 fas fa-cloud-sun';
+                            break;
+                        default:
+                            weatherIconEl.className = 'text-5xl md:text-6xl text-yellow-500 fas fa-sun';
+                            break;
+                    }
+                }
             };
             updateWeather();
-            setInterval(updateWeather, 300000);
 
             // Manual Sell Form Submission
             const sellForm = document.getElementById('sell-form');
