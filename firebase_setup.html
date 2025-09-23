@@ -28,24 +28,54 @@
                     await signInAnonymously(auth);
                 }
 
-                const weatherData = {
-                    location: "Nashik, Maharashtra, India",
-                    temp: "28°C",
-                    condition: "Partly Cloudy",
-                    wind: "12 km/h",
-                    humidity: "65%",
-                    sunlight: "6.2 hrs",
-                    irradiance: "4.2 kWh/m²",
-                    sunrise: "06:12",
-                    sunset: "18:45"
-                };
+                // Get user's location
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(async (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        const apiKey = 'b9b6b7a5a812371549b0f594b595a098'; // TODO: Replace with your API key
+                        const weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
 
-                const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
-                await setDoc(weatherDocRef, weatherData);
+                        try {
+                            const response = await fetch(weatherApiUrl);
+                            const weather = await response.json();
 
-                statusElem.textContent = 'Success! Weather data has been uploaded to Firebase. You can now close this tab.';
-                statusElem.classList.remove('text-gray-500');
-                statusElem.classList.add('text-green-600', 'font-semibold');
+                            const weatherData = {
+                                location: `${weather.name}, ${weather.sys.country}`,
+                                temp: `${weather.main.temp}°C`,
+                                condition: weather.weather[0].description,
+                                wind: `${weather.wind.speed} m/s`,
+                                humidity: `${weather.main.humidity}%`,
+                                sunlight: "N/A", // OpenWeatherMap free tier doesn't provide this directly
+                                irradiance: "N/A", // OpenWeatherMap free tier doesn't provide this directly
+                                sunrise: new Date(weather.sys.sunrise * 1000).toLocaleTimeString(),
+                                sunset: new Date(weather.sys.sunset * 1000).toLocaleTimeString()
+                            };
+
+                            const weatherDocRef = doc(db, 'artifacts', appId, 'public', 'weather', 'current');
+                            await setDoc(weatherDocRef, weatherData);
+
+                            statusElem.textContent = 'Success! Weather data has been uploaded to Firebase. You can now close this tab.';
+                            statusElem.classList.remove('text-gray-500');
+                            statusElem.classList.add('text-green-600', 'font-semibold');
+
+                        } catch (e) {
+                             console.error('Failed to fetch weather data:', e);
+                             statusElem.textContent = 'Error: Failed to fetch weather data. Please check the console for details.';
+                             statusElem.classList.remove('text-gray-500');
+                             statusElem.classList.add('text-red-600', 'font-semibold');
+                        }
+                    }, (error) => {
+                        console.error('Geolocation error:', error);
+                        statusElem.textContent = 'Error: Geolocation is not enabled or permission was denied.';
+                        statusElem.classList.remove('text-gray-500');
+                        statusElem.classList.add('text-red-600', 'font-semibold');
+                    });
+                } else {
+                    statusElem.textContent = 'Error: Geolocation is not supported by this browser.';
+                    statusElem.classList.remove('text-gray-500');
+                    statusElem.classList.add('text-red-600', 'font-semibold');
+                }
 
             } catch (e) {
                 console.error('Firebase setup failed:', e);
